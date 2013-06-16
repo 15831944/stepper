@@ -1,41 +1,8 @@
 #include "stm32f4xx_conf.h"
 
+#include "stepper.h";
+#include "inputs.h";
 
-uint32_t freq_request = 1;
-uint32_t freq_current = 1;
-
-void TIM2_IRQHandler(void)
-{
-    static int direction_up = 1;
-
-    if (TIM2->SR & TIM_SR_UIF)
-    {
-        GPIOD->ODR ^= (1 << 9);
-
-        if (direction_up == 1)
-        {
-            freq_current++;
-        }
-        else
-        {
-            freq_current--;
-        }
-
-        if (freq_current >= freq_request)
-        {
-            direction_up = 0;
-        }
-        if (freq_current == 0)
-        {
-            direction_up = 1;
-        }
-
-        //TIM2->ARR = freq_current;
-        TIM2->ARR = (uint32_t) ( (float)0x1000 / (float) freq_current) + 3;
-
-    }
-    TIM2->SR = 0x0; // reset the status register
-}
 
 void TIM4_IRQHandler(void)
 {
@@ -79,7 +46,7 @@ void EXTI0_IRQHandler(void)
     TIM4->CCR2 = TIM4->CCR3 = TIM4->CCR4 = TIM4->CCR1;
 
     TIM2->ARR -= (TIM2->ARR / 20);
-    freq_request ++;// (freq_request /20);
+    //freq_request ++;// (freq_request /20);
 
     //GPIOD->ODR ^= (1 << 13);
 
@@ -88,28 +55,12 @@ void EXTI0_IRQHandler(void)
 }
 
 
-void EXTI9_5_IRQHandler(void)
-{
-    TIM4->CCR1 = 0x001;
-    TIM4->CCR2 = TIM4->CCR3 = TIM4->CCR4 = TIM4->CCR1;
-
-    TIM2->ARR -= (TIM2->ARR / 20);
-    freq_request ++;// (freq_request /20);
-
-    //GPIOD->ODR ^= (1 << 13);
-
-    //EXTI->PR |= EXTI_PR_PR0; // reset the interrupt
-    EXTI_ClearITPendingBit(EXTI_Line7);
-    EXTI_ClearITPendingBit(EXTI_Line9);
-}
-
 int main(void)
 {
-    RCC->AHB1ENR |= RCC_AHB1ENR_GPIODEN; // enable the clock to GPIOD
-    RCC->APB1ENR |= RCC_APB1ENR_TIM2EN; // enable TIM2 clock
-    RCC->APB1ENR |= RCC_APB1ENR_TIM4EN; // enable TIM4 clock
      
-    GPIOD->MODER = (1 << (2*9)) + (2 << (2*12) ) + (2 << (2*13) ) + (2 << (2*14) ) + (2 << (2*15) ); // set pin 13 to be alternate function mode
+    // Leds
+    RCC->AHB1ENR |= RCC_AHB1ENR_GPIODEN; // enable the clock to GPIOD
+    GPIOD->MODER = (2 << (2*12) ) + (2 << (2*13) ) + (2 << (2*14) ) + (2 << (2*15) ); // set pin 13 to be alternate function mode
     GPIOD->AFR[1] = (2 << 16) + (2 << 20) + (2 << 24) + (2 << 28); // pin 13 in alternate function AF2
 
     GPIOD->ODR ^= (1 << 13);
@@ -117,20 +68,9 @@ int main(void)
     // Enable FPU
     SCB->CPACR |= ((3UL << 10*2)|(3UL << 11*2));  /* set CP10 and CP11 Full Access */
 
-    // Timer 2 : stepper
-    NVIC->ISER[0] |= 1 << (TIM2_IRQn); // enable the TIM2 IRQ
-
-    TIM2->PSC = 0x0008; // no prescaler, timer counts up in sync with the peripheral clock
-    TIM2->DIER |= TIM_DIER_UIE; // enable update interrupt
-    TIM2->ARR = 0x1000; // count to 1 (autoreload value 1)
-    freq_current = 1;
-    freq_request = 1;
-
-    TIM2->CR1 |= TIM_CR1_ARPE | TIM_CR1_CEN; // autoreload on, counter enabled
-    TIM2->EGR = 1; // trigger update event to reload timer registers
-
-
     // Timer 4
+    RCC->APB1ENR |= RCC_APB1ENR_TIM4EN; // enable TIM4 clock
+
     NVIC->ISER[0] |= 1 << (TIM4_IRQn); // enable the TIM4 IRQ
      
     TIM4->PSC = 0x0080; // no prescaler, timer counts up in sync with the peripheral clock
@@ -153,7 +93,7 @@ int main(void)
 
     // External interrupt on PA0
 
-    RCC_APB2PeriphClockCmd(RCC_APB2Periph_SYSCFG, ENABLE);
+//    RCC_APB2PeriphClockCmd(RCC_APB2Periph_SYSCFG, ENABLE);
 //    RCC_AHB1PeriphClockCmd(RCC_AHB1Periph_GPIOA, ENABLE);
 
 //    SYSCFG_EXTILineConfig(EXTI_PortSourceGPIOA, EXTI_PinSource0);
@@ -179,60 +119,8 @@ int main(void)
 //    NVIC_InitStructure.NVIC_IRQChannelCmd = ENABLE;
 //    NVIC_Init(&NVIC_InitStructure);
 
-
-    // External interrupt on PE9
-    RCC_APB2PeriphClockCmd(RCC_APB2Periph_SYSCFG, ENABLE);
-    RCC_AHB1PeriphClockCmd(RCC_AHB1Periph_GPIOE, ENABLE);
-
-    SYSCFG_EXTILineConfig(EXTI_PortSourceGPIOE, EXTI_PinSource9);
-
-    GPIO_InitTypeDef   GPIO_InitStructureE9;
-    EXTI_InitTypeDef   EXTI_InitStructureE9;
-    NVIC_InitTypeDef   NVIC_InitStructureE9;
-
-    GPIO_InitStructureE9.GPIO_Mode = GPIO_Mode_IN;
-    GPIO_InitStructureE9.GPIO_PuPd = GPIO_PuPd_DOWN;
-    GPIO_InitStructureE9.GPIO_Pin = GPIO_Pin_9;
-    GPIO_Init(GPIOE, &GPIO_InitStructureE9);
-
-    EXTI_InitStructureE9.EXTI_Line = EXTI_Line9;
-    EXTI_InitStructureE9.EXTI_Mode = EXTI_Mode_Interrupt;
-    EXTI_InitStructureE9.EXTI_Trigger = EXTI_Trigger_Falling;
-    EXTI_InitStructureE9.EXTI_LineCmd = ENABLE;
-    EXTI_Init(&EXTI_InitStructureE9);
-
-    NVIC_InitStructureE9.NVIC_IRQChannel = EXTI9_5_IRQn;
-    NVIC_InitStructureE9.NVIC_IRQChannelPreemptionPriority = 0x0F;
-    NVIC_InitStructureE9.NVIC_IRQChannelSubPriority = 0x0F;
-    NVIC_InitStructureE9.NVIC_IRQChannelCmd = ENABLE;
-    NVIC_Init(&NVIC_InitStructureE9);
-
-    // External interrupt on PE9
-    RCC_APB2PeriphClockCmd(RCC_APB2Periph_SYSCFG, ENABLE);
-    RCC_AHB1PeriphClockCmd(RCC_AHB1Periph_GPIOE, ENABLE);
-
-    SYSCFG_EXTILineConfig(EXTI_PortSourceGPIOE, EXTI_PinSource9);
-
-    GPIO_InitTypeDef   GPIO_InitStructureE7;
-    EXTI_InitTypeDef   EXTI_InitStructureE7;
-    NVIC_InitTypeDef   NVIC_InitStructureE7;
-
-    GPIO_InitStructureE7.GPIO_Mode = GPIO_Mode_IN;
-    GPIO_InitStructureE7.GPIO_PuPd = GPIO_PuPd_DOWN;
-    GPIO_InitStructureE7.GPIO_Pin = GPIO_Pin_7;
-    GPIO_Init(GPIOE, &GPIO_InitStructureE7);
-
-    EXTI_InitStructureE7.EXTI_Line = EXTI_Line7;
-    EXTI_InitStructureE7.EXTI_Mode = EXTI_Mode_Interrupt;
-    EXTI_InitStructureE7.EXTI_Trigger = EXTI_Trigger_Falling;
-    EXTI_InitStructureE7.EXTI_LineCmd = ENABLE;
-    EXTI_Init(&EXTI_InitStructureE7);
-
-    NVIC_InitStructureE7.NVIC_IRQChannel = EXTI9_5_IRQn;
-    NVIC_InitStructureE7.NVIC_IRQChannelPreemptionPriority = 0x0F;
-    NVIC_InitStructureE7.NVIC_IRQChannelSubPriority = 0x0F;
-    NVIC_InitStructureE7.NVIC_IRQChannelCmd = ENABLE;
-    NVIC_Init(&NVIC_InitStructureE7);
+    stepper_init();
+    inputs_init();
 
     /*
     RCC->AHB1ENR |= RCC_AHB1ENR_GPIOAEN; // enable the clock to GPIOA

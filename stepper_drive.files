@@ -75,3 +75,7 @@ lib/startup_stm32f4xx.s
 src/main.c
 src/system_stm32f4xx.c
 stm32_flash.ld
+src/stepper.h
+src/stepper.c
+src/inputs.h
+src/inputs.c
