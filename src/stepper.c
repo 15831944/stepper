@@ -40,22 +40,22 @@ void TIM2_IRQHandler(void)
             position_current--;
         }
 
-        if (position_current == position_request)
-        {
-            if (position_request == 0)
-            {
-                direction = STEPPER_Forward;
-                position_request = 16*200*2;
-            }
-            else
-            {
-                direction = STEPPER_Backward;
-                position_request = 0;
-            }
-        }
-        else
-        {
-        }
+//        if (position_current == position_request)
+//        {
+//            if (position_request == 0)
+//            {
+//                direction = STEPPER_Forward;
+//                position_request = 16*200*2;
+//            }
+//            else
+//            {
+//                direction = STEPPER_Backward;
+//                position_request = 0;
+//            }
+//        }
+//        else
+//        {
+//        }
 
 
         //TIM2->ARR = freq_current;
@@ -95,3 +95,18 @@ void stepper_init()
 //    GPIOE->MODER |= (1 << (2*11));
 }
 
+
+void stepper_set_forward()
+{
+    direction = STEPPER_Forward;
+}
+
+void stepper_set_backward()
+{
+    direction = STEPPER_Backward;
+}
+
+bool StepperIsForward()
+{
+    return (direction == STEPPER_Forward);
+}

@@ -2,21 +2,39 @@
 
 #include "stm32f4xx_conf.h"
 
+#include "stepper.h"
 
 
 void EXTI9_5_IRQHandler(void)
 {
-    TIM4->CCR1 = 0x001;
-    TIM4->CCR2 = TIM4->CCR3 = TIM4->CCR4 = TIM4->CCR1;
+//    TIM4->CCR1 = 0x001;
+//    TIM4->CCR2 = TIM4->CCR3 = TIM4->CCR4 = TIM4->CCR1;
 
-    TIM2->ARR -= (TIM2->ARR / 20);
-    //freq_request ++;// (freq_request /20);
+//    TIM2->ARR -= (TIM2->ARR / 20);
 
-    //GPIOD->ODR ^= (1 << 13);
+//    if (GPIO_ReadInputDataBit(GPIOE, GPIO_Pin_7) == Bit_SET)
+//    {
+//        stepper_set_forward();
+//    }
+
+//    else if (GPIO_ReadInputDataBit(GPIOE, GPIO_Pin_9) == Bit_SET)
+//    {
+//        stepper_set_backward();
+//    }
 
     //EXTI->PR |= EXTI_PR_PR0; // reset the interrupt
-    EXTI_ClearITPendingBit(EXTI_Line7);
-    EXTI_ClearITPendingBit(EXTI_Line9);
+    if (EXTI_GetFlagStatus(EXTI_Line7) == SET)
+    {
+        EXTI_ClearITPendingBit(EXTI_Line7);
+        stepper_set_forward();
+    }
+
+    if (EXTI_GetFlagStatus(EXTI_Line9) == SET)
+    {
+        EXTI_ClearITPendingBit(EXTI_Line9);
+        stepper_set_backward();
+    }
+
 }
 
 
@@ -49,11 +67,11 @@ void inputs_init()
     NVIC_InitStructureE9.NVIC_IRQChannelCmd = ENABLE;
     NVIC_Init(&NVIC_InitStructureE9);
 
-    // External interrupt on PE9
+    // External interrupt on PE7
     RCC_APB2PeriphClockCmd(RCC_APB2Periph_SYSCFG, ENABLE);
     RCC_AHB1PeriphClockCmd(RCC_AHB1Periph_GPIOE, ENABLE);
 
-    SYSCFG_EXTILineConfig(EXTI_PortSourceGPIOE, EXTI_PinSource9);
+    SYSCFG_EXTILineConfig(EXTI_PortSourceGPIOE, EXTI_PinSource7);
 
     GPIO_InitTypeDef   GPIO_InitStructureE7;
     EXTI_InitTypeDef   EXTI_InitStructureE7;

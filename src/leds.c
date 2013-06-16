@@ -2,6 +2,7 @@
 
 #include "stm32f4xx_conf.h"
 
+#include "stepper.h"
 
 void TIM4_IRQHandler(void)
 {
@@ -29,10 +30,37 @@ void TIM4_IRQHandler(void)
           dir_up = 1;
       }
 
-      TIM4->CCR2 = TIM4->CCR1;
-      TIM4->CCR3 = 0x100 - TIM4->CCR1;
-      TIM4->CCR4 = 0x100 - TIM4->CCR1;
+      //TIM4->CCR2 = TIM4->CCR1;
+      //TIM4->CCR3 = 0x100 - TIM4->CCR1;
+      //TIM4->CCR4 = 0x100 - TIM4->CCR1;
       //TIM4->CCR4 = TIM4->CCR1;
+
+      if (StepperIsForward() == true)
+      {
+          TIM4->CCR2 = 0x100;
+      }
+      else
+      {
+          TIM4->CCR2 = 0x0;
+      }
+
+      if (GPIO_ReadInputDataBit(GPIOE, GPIO_Pin_7) == Bit_SET)
+      {
+          TIM4->CCR3 = 0x100;//0x100 - TIM4->CCR1;
+      }
+      else
+      {
+          TIM4->CCR3 = 0x0;//TIM4->CCR3 = TIM4->CCR1;
+      }
+
+      if (GPIO_ReadInputDataBit(GPIOE, GPIO_Pin_9) == Bit_SET)
+      {
+          TIM4->CCR4 = 0x100;//0x100 - TIM4->CCR1;
+      }
+      else
+      {
+          TIM4->CCR4 = 0x0;TIM4->CCR1;
+      }
   }
 
   TIM4->SR = 0x0; // reset the status register
