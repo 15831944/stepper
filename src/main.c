@@ -1,9 +1,9 @@
 #include "stm32f4xx_conf.h"
 
-#include "sys.h";
-#include "leds.h";
-#include "stepper.h";
-#include "inputs.h";
+#include "sys.h"
+#include "leds.h"
+#include "stepper.h"
+#include "inputs.h"
 
 
 void EXTI0_IRQHandler(void)

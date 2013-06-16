@@ -6,37 +6,65 @@
 uint32_t freq_request = 1;
 uint32_t freq_current = 1;
 
+int32_t position_current = 0;
+int32_t position_request = 16*200*2;
+
+
+typedef enum
+{
+    STEPPER_Forward = 0,
+    STEPPER_Backward
+
+} STEPPER_DIR;
+
+
+STEPPER_DIR direction = STEPPER_Forward;
+
 void TIM2_IRQHandler(void)
 {
-    static int direction_up = 1;
 
     if (TIM2->SR & TIM_SR_UIF)
     {
-        GPIOE->ODR ^= (1 << 11);
+        GPIO_ToggleBits(GPIOE, GPIO_Pin_11);
 
-        if (direction_up == 1)
+        if (direction == STEPPER_Forward)
         {
-            freq_current++;
+            GPIO_WriteBit(GPIOE, GPIO_Pin_13, Bit_SET);
+            //GPIO_SetBits(GPIOE, GPIO_Pin_13);
+            position_current++;
         }
         else
         {
-            freq_current--;
+            GPIO_WriteBit(GPIOE, GPIO_Pin_13, Bit_RESET);
+            //GPIO_ResetBits(GPIOE, GPIO_Pin_13);
+            position_current--;
         }
 
-        if (freq_current >= freq_request)
+        if (position_current == position_request)
         {
-            direction_up = 0;
+            if (position_request == 0)
+            {
+                direction = STEPPER_Forward;
+                position_request = 16*200*2;
+            }
+            else
+            {
+                direction = STEPPER_Backward;
+                position_request = 0;
+            }
         }
-        if (freq_current == 0)
+        else
         {
-            direction_up = 1;
         }
+
 
         //TIM2->ARR = freq_current;
         TIM2->ARR = (uint32_t) ( (float)0x1000 / (float) freq_current) + 3;
+
     }
     TIM2->SR = 0x0; // reset the status register
 }
+
 
 void stepper_init()
 {
@@ -60,7 +88,7 @@ void stepper_init()
     GPIO_InitTypeDef   GPIO_InitStructure;
     GPIO_InitStructure.GPIO_Mode = GPIO_Mode_OUT;
     GPIO_InitStructure.GPIO_PuPd = GPIO_PuPd_NOPULL;
-    GPIO_InitStructure.GPIO_Pin = GPIO_Pin_11;
+    GPIO_InitStructure.GPIO_Pin = GPIO_Pin_11 | GPIO_Pin_13;
     GPIO_Init(GPIOE, &GPIO_InitStructure);
 
 //    RCC->AHB1ENR |= RCC_AHB1ENR_GPIOEEN; // enable the clock to GPIOE
