@@ -79,3 +79,7 @@ src/stepper.h
 src/stepper.c
 src/inputs.h
 src/inputs.c
+src/leds.h
+src/leds.c
+src/sys.h
+src/sys.c
