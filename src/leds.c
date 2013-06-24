@@ -73,7 +73,7 @@ void leds_init()
     GPIOD->MODER = (2 << (2*12) ) + (2 << (2*13) ) + (2 << (2*14) ) + (2 << (2*15) ); // set pin 13 to be alternate function mode
     GPIOD->AFR[1] = (2 << 16) + (2 << 20) + (2 << 24) + (2 << 28); // pin 13 in alternate function AF2
 
-    GPIOD->ODR ^= (1 << 13);
+    //GPIOD->ODR ^= (1 << 13);
 
 
     // Timer 4

@@ -1,3 +1,4 @@
+Makefile
 inc/stm32f4xx_conf.h
 lib/inc/core/arm_common_tables.h
 lib/inc/core/arm_math.h
@@ -83,3 +84,14 @@ src/leds.h
 src/leds.c
 src/sys.h
 src/sys.c
+usb/usbh_conf.h
+usb/usbd_desc.h
+usb/usbd_conf.h
+usb/usbd_cdc_vcp.h
+usb/usb_conf.h
+usb/usbd_usr.c
+usb/usbd_desc.c
+usb/usbd_cdc_vcp.c
+usb/usb_bsp_template.c
+usb/stm32f4xx_it.h
+usb/stm32f4xx_it.c

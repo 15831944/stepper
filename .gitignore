@@ -1,3 +1,6 @@
 *.[oa]
 *~
 *.creator.user*
+*.bin
+*.hex
+*.elf
