@@ -25,12 +25,26 @@ vpath %.a lib
 
 ROOT=$(shell pwd)
 
-CFLAGS += -Iinc -Ilib -Ilib/inc 
-CFLAGS += -Ilib/inc/core -Ilib/inc/peripherals 
+CFLAGS += -Iinc
+#CFLAGS += -Ilib -Ilib/inc
+#CFLAGS += -Ilib/inc/core -Ilib/inc/peripherals 
+#LIBPATH += -Llib
+#LIBS += -lstm32f4
+
 
 SRCS += lib/startup_stm32f4xx.s # add startup file to build
 
 OBJS = $(SRCS:.c=.o)
+
+
+
+
+# stm32f4_discovery lib
+CFLAGS+=-Ilib/STM32F4xx_StdPeriph_Driver/inc
+CFLAGS+=-Ilib/STM32F4xx_StdPeriph_Driver/inc/device_support
+CFLAGS+=-Ilib/STM32F4xx_StdPeriph_Driver/inc/core_support
+LIBPATH += -Llib/STM32F4xx_StdPeriph_Driver/build
+LIBS += -lSTM32F4xx_StdPeriph_Driver
 
 ###################################################
 
@@ -39,12 +53,12 @@ OBJS = $(SRCS:.c=.o)
 all: lib proj
 
 lib:
-	$(MAKE) -C lib
+	$(MAKE) -C lib/STM32F4xx_StdPeriph_Driver/build/
 
 proj: 	$(PROJ_NAME).elf
 
 $(PROJ_NAME).elf: $(SRCS)
-	$(CC) $(CFLAGS) $^ -o $@ -Llib -lstm32f4
+	$(CC) $(CFLAGS) $^ -o $@ $(LIBPATH) $(LIBS)
 	$(OBJCOPY) -O ihex $(PROJ_NAME).elf $(PROJ_NAME).hex
 	$(OBJCOPY) -O binary $(PROJ_NAME).elf $(PROJ_NAME).bin
 
@@ -53,3 +67,6 @@ clean:
 	rm -f $(PROJ_NAME).elf
 	rm -f $(PROJ_NAME).hex
 	rm -f $(PROJ_NAME).bin
+
+distclean: clean
+	$(MAKE) clean -C lib/STM32F4xx_StdPeriph_Driver/build/
