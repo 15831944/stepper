@@ -57,7 +57,7 @@ void inputs_init()
 
     EXTI_InitStructureE9.EXTI_Line = EXTI_Line9;
     EXTI_InitStructureE9.EXTI_Mode = EXTI_Mode_Interrupt;
-    EXTI_InitStructureE9.EXTI_Trigger = EXTI_Trigger_Falling;
+    EXTI_InitStructureE9.EXTI_Trigger = EXTI_Trigger_Rising;
     EXTI_InitStructureE9.EXTI_LineCmd = ENABLE;
     EXTI_Init(&EXTI_InitStructureE9);
 
@@ -84,7 +84,7 @@ void inputs_init()
 
     EXTI_InitStructureE7.EXTI_Line = EXTI_Line7;
     EXTI_InitStructureE7.EXTI_Mode = EXTI_Mode_Interrupt;
-    EXTI_InitStructureE7.EXTI_Trigger = EXTI_Trigger_Falling;
+    EXTI_InitStructureE7.EXTI_Trigger = EXTI_Trigger_Rising;
     EXTI_InitStructureE7.EXTI_LineCmd = ENABLE;
     EXTI_Init(&EXTI_InitStructureE7);
 

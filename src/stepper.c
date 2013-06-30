@@ -2,6 +2,7 @@
 
 #include "stm32f4xx_conf.h"
 
+#include <stdio.h>
 
 uint32_t freq_request = 1;
 uint32_t freq_current = 1;
@@ -99,14 +100,21 @@ void stepper_init()
 void stepper_set_forward()
 {
     direction = STEPPER_Forward;
+    printf("FW\n");
 }
 
 void stepper_set_backward()
 {
     direction = STEPPER_Backward;
+    printf("BW\n");
 }
 
 bool StepperIsForward()
 {
     return (direction == STEPPER_Forward);
+}
+
+uint32_t getStepperPos()
+{
+    return position_current;
 }

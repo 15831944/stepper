@@ -8,6 +8,7 @@
 #include <stdio.h>
 #include <math.h>
 
+#include "usbd_cdc_vcp.h"
 
 void EXTI0_IRQHandler(void)
 {
@@ -36,6 +37,7 @@ volatile uint32_t time_var1, time_var2;
 
 
 void calculation_test();
+void Delay(volatile uint32_t nCount);
 
 int main(void)
 {
@@ -59,11 +61,43 @@ int main(void)
 
     setbuf(stdout, NULL);
 
+    Delay(2000);
+
+    puts("MENU:\n"
+         "1 : pos\n"
+         "2 : dir\n");
+
     while (1)
     {
         // should go idle...
-        printf("test\n\r");
-        Delay(500);
+        //printf("Pos = %d\n", getStepperPos());
+        Delay(10);
+
+        char buffer[255];
+        gets(buffer);
+//        int num = VCP_get_string(buffer);
+//        if (buffer[0] != 0)
+//        {
+//            printf("data : %s\n", buffer);
+//        }
+
+        int i = 0;
+        while ( (buffer[i] != 0) )
+        {
+            //printf("i=%d : %d\n", i , buffer[i]);
+
+            switch (buffer[i])
+            {
+            case '1':
+                printf("Pos = %d\n", getStepperPos());
+                break;
+            case '2':
+                printf("Dir = %s\n", StepperIsForward() ? "Forward" : "Backward");
+                break;
+
+            }
+            i++;
+        }
     }
 
 }
