@@ -5,6 +5,12 @@
 #include "stepper.h"
 
 
+void EXTI0_IRQHandler(void)
+{
+    EXTI_ClearITPendingBit(EXTI_Line0);
+}
+
+
 void EXTI9_5_IRQHandler(void)
 {
 //    TIM4->CCR1 = 0x001;

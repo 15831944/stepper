@@ -18,6 +18,8 @@
 #-mfloat-abi=hard -mfpu=fpv4-sp-d16 
 # -o stepper_drive.elf
 
+QMAKE_CFLAGS += -std=c99
+
 INCLUDEPATH += inc \
 #        lib/STM32F4xx_StdPeriph_Driver/inc \
 #        lib/STM32F4xx_StdPeriph_Driver/inc/device_support \
@@ -36,6 +38,16 @@ SOURCES += src/main.c \
         src/stepper.c \
         src/inputs.c \
         src/system_stm32f4xx.c \
+        src/gcode.c \
+    src/usb.c
+
+HEADERS += \
+        src/gcode.h \
+        src/sys.h \
+        src/stepper.h \
+        src/leds.h \
+        src/inputs.h \
+    src/usb.h
 
 SOURCES += lib/startup_stm32f4xx.s
 
@@ -59,3 +71,4 @@ SOURCES += usb/usbd_cdc_vcp.c \
 include(lib/STM32F4xx_StdPeriph_Driver/STM32F4xx_StdPeriph_Driver.pri)
 
 #QMAKE_POST_LINK += arm-none-eabi-objcopy -O ihex stepper stepper.hex && arm-none-eabi-objcopy -O binary stepper stepper.bin
+
