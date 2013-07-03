@@ -8,12 +8,18 @@ uint32_t freq_request = 1;
 uint32_t freq_current = 1;
 
 int32_t position_current = 0;
-int32_t position_request = 16*200*2;
+int32_t position_request = 0;
+
+// consts
+//const float MICROSTEPS = 16;
+#define MICROSTEPS 16
+const float mm2steps = MICROSTEPS * 200.0 / (8.0 * 5.0); // microstep ratio * NbSteps / (Ntooth * PitchBelt)
 
 
 typedef enum
 {
-    STEPPER_Forward = 0,
+    STEPPER_Stopped = 0,
+    STEPPER_Forward,
     STEPPER_Backward
 
 } STEPPER_DIR;
@@ -26,7 +32,23 @@ void TIM2_IRQHandler(void)
 
     if (TIM2->SR & TIM_SR_UIF)
     {
-        GPIO_ToggleBits(GPIOE, GPIO_Pin_11);
+
+        if (position_current < position_request)
+        {
+            // Go Forward
+            direction = STEPPER_Forward;
+        }
+        else if (position_current > position_request)
+        {
+            // Go Backward
+            direction = STEPPER_Backward;
+        }
+        else
+        {
+            // Stop
+            direction = STEPPER_Stopped;
+        }
+
 
         if (direction == STEPPER_Forward)
         {
@@ -34,34 +56,20 @@ void TIM2_IRQHandler(void)
             //GPIO_SetBits(GPIOE, GPIO_Pin_13);
             position_current++;
         }
-        else
+        else if (direction == STEPPER_Backward)
         {
             GPIO_WriteBit(GPIOE, GPIO_Pin_13, Bit_RESET);
             //GPIO_ResetBits(GPIOE, GPIO_Pin_13);
             position_current--;
         }
 
-//        if (position_current == position_request)
-//        {
-//            if (position_request == 0)
-//            {
-//                direction = STEPPER_Forward;
-//                position_request = 16*200*2;
-//            }
-//            else
-//            {
-//                direction = STEPPER_Backward;
-//                position_request = 0;
-//            }
-//        }
-//        else
-//        {
-//        }
-
+        if (direction != STEPPER_Stopped)
+        {
+            GPIO_ToggleBits(GPIOE, GPIO_Pin_11);
+        }
 
         //TIM2->ARR = freq_current;
         TIM2->ARR = (uint32_t) ( (float)0x1000 / (float) freq_current) + 3;
-
     }
     TIM2->SR = 0x0; // reset the status register
 }
@@ -94,6 +102,17 @@ void stepper_init()
 
 //    RCC->AHB1ENR |= RCC_AHB1ENR_GPIOEEN; // enable the clock to GPIOE
 //    GPIOE->MODER |= (1 << (2*11));
+}
+
+void stepper_move(float delta)
+{
+    position_request += 2 * delta * mm2steps; // x2 because of using toggle in interrupts (2 interrupts for one pulse)
+}
+
+void stepper_stop()
+{
+    direction == STEPPER_Stopped;
+    position_request = position_current;
 }
 
 

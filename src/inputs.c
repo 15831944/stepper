@@ -32,13 +32,13 @@ void EXTI9_5_IRQHandler(void)
     if (EXTI_GetFlagStatus(EXTI_Line7) == SET)
     {
         EXTI_ClearITPendingBit(EXTI_Line7);
-        stepper_set_forward();
+        stepper_stop();//stepper_set_forward();
     }
 
     if (EXTI_GetFlagStatus(EXTI_Line9) == SET)
     {
         EXTI_ClearITPendingBit(EXTI_Line9);
-        stepper_set_backward();
+        stepper_stop();//stepper_set_backward();
     }
 
 }

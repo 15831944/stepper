@@ -2,6 +2,12 @@
 
 #include <string.h>
 #include <stdbool.h>
+#include <stdlib.h>
+#include <stdio.h>
+
+
+#include "stepper.h"
+
 
 // Enums
 typedef enum
@@ -32,6 +38,12 @@ typedef struct
     /// \todo to be complete with all other commands
 } gcode_state;
 
+
+// The IEEE 754 standard specifies a binary32 as having:
+// Sign bit: 1 bit
+// Exponent width: 8 bits
+// Significand precision: 24 (23 explicitly stored) => 2^24 = 16777216 coded without loss = 16 m @ 1µm precision.
+
 typedef struct
 {
     // pos
@@ -50,11 +62,16 @@ typedef struct
     float j;
     float k;
 
+    // commands
+    float g;
+    float m;
+    float t;
+
 } cmd_param;
 
 
 // Member variables
-static char receiveBuffer[256];
+//static char receiveBuffer[256];
 static gcode_state state =
 {
     .units = millimiters,
@@ -66,10 +83,10 @@ static gcode_state state =
 };
 
 // Private Prototypes
-void processCode(char* data);
-void processGCode(int num);
-void processMCode(int num, char* data);
-void processTCode(int num);
+void parseCode(const char* const data);
+void processGCode(const int num, const cmd_param param);
+void processMCode(const int num, const char* const data);
+void processTCode(const int num);
 
 
 // Definitions
@@ -82,15 +99,125 @@ void gcode_init()
 void gcode_parse(char* data)
 {
     // Add buffering logic here
-    processCode(data);
+    parseCode(data);
 }
 
 
-void processCode(char* data)
+void parseCode(const char* const data)
 {
     // Get Letter and Number
     char letter = '\0';
     int num = 0;
+    float value = 0;
+
+    cmd_param param;
+    memset(&param, 0, sizeof(param)); // Init to zero structure (float at 0 should be 0.0 value).
+
+
+    char* chrPtr = &data[0];
+
+//    puts("Start parsing\n");
+    while ( (*chrPtr != '\0') && (chrPtr < (data + strlen(data))) ) // While not at the end of the string
+    {
+//        if(*chrPtr == ' ')
+//        {
+////            puts("Space, continue\n");
+//            chrPtr++;
+//            continue;
+//        }
+
+        if( (*chrPtr >= 'A')
+                && (*chrPtr <= 'Z') ) // Is a Valid GCode letter
+        {
+//            puts("Valid letter found\n");
+            letter = *chrPtr;
+
+            chrPtr++; // Go to next character. Should be a number or a space
+
+            if (*chrPtr != '\0') // If it is not end of string
+            {
+//                puts("Value found\n");
+                value = strtof(chrPtr, &chrPtr);
+
+                // affect value to the parameter list
+                switch(letter)
+                {
+                    case 'E': // E = Precision feedrate for threading on lathes
+                        param.e = value;
+                        break;
+                    case 'F': // F = Defines feed rate
+                        param.f = value;
+                        break;
+                    case 'G': //
+                        param.g = value;
+                        break;
+
+                    case 'I': // I = Defines arc center in X axis for G02 or G03 arc commands.
+                        param.i = value;
+                        break;
+                    case 'J': // J = Defines arc center in Y axis for G02 or G03 arc commands.
+                        param.j = value;
+                        break;
+                    case 'K': // K = Defines arc center in Z axis for G02 or G03 arc commands.
+                        param.k = value;
+                        break;
+                    case 'M': //
+                        param.m = value;
+                        break;
+
+                    case 'P': // P = Serves as parameter address for various G and M codes
+                        param.p = value;
+                        break;
+
+                    case 'S': // S = Defines speed, either spindle speed or surface speed depending on mode
+                        param.s = value;
+                        break;
+                    case 'T': //
+                        param.t = value;
+                        break;
+
+                    case 'X': // X = Absolute or incremental position of X axis.
+                        param.x = value;
+                        break;
+                    case 'Y': // Y = Absolute or incremental position of Y axis
+                        param.y = value;
+                        break;
+                    case 'Z': // Z = Absolute or incremental position of Z axis
+                        param.z = value;
+                        break;
+                    default:
+                        //
+                        break;
+                }
+//                break; /// \todo Debug line...
+
+            }
+//            puts("Next char\n");
+        }
+        else
+        {
+            chrPtr++;
+        }
+    }
+
+//    puts("Finished parsing\n");
+
+    //Dump the parameters read:
+//    printf("e=%f\n", param.e);
+//    printf("f=%f\n", param.f);
+//    printf("g=%f\n", param.g);
+//    printf("i=%f\n", param.i);
+//    printf("j=%f\n", param.j);
+//    printf("k=%f\n", param.k);
+//    printf("m=%f\n", param.m);
+//    printf("p=%f\n", param.p);
+//    printf("s=%f\n", param.s);
+//    printf("t=%f\n", param.t);
+//    printf("x=%f\n", param.x);
+//    printf("y=%f\n", param.y);
+//    printf("z=%f\n", param.z);
+
+
     sscanf(data, "%c%d", &letter, &num);
 
     switch (letter)
@@ -103,7 +230,7 @@ void processCode(char* data)
         case 'F': // F = Defines feed rate
             break;
         case 'G': // G = Address for preparatory commands
-            processGCode(num);
+            processGCode(param.g, param);
             break;
         case 'H': // H = Defines tool length offset;
         case 'I': // I = Defines arc center in X axis for G02 or G03 arc commands.
@@ -135,7 +262,7 @@ void processCode(char* data)
     }
 }
 
-void processGCode(int num)
+void processGCode(int num, const cmd_param param)
 {
     switch (num)
     {
@@ -143,6 +270,7 @@ void processGCode(int num)
             puts("ok\n");
             break;
         case 1: // G1 = Controlled move
+            stepper_move(param.x);
             puts("ok\n");
             break;
         case 4: // G4 = Dwell
@@ -181,7 +309,7 @@ void processGCode(int num)
     }
 }
 
-void processMCode(int num, char* data)
+void processMCode(const int num, const char* const data)
 {
     switch(num)
     {
@@ -311,7 +439,7 @@ void processMCode(int num, char* data)
     }
 }
 
-void processTCode(int num)
+void processTCode(const int num)
 {
     switch (num)
     {
