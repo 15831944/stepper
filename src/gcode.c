@@ -67,6 +67,9 @@ typedef struct
     float m;
     float t;
 
+    // Line number
+    float n;
+    float checksum;
 } cmd_param;
 
 
@@ -84,9 +87,9 @@ static gcode_state state =
 
 // Private Prototypes
 void parseCode(const char* const data);
-void processGCode(const int num, const cmd_param param);
-void processMCode(const int num, const char* const data);
-void processTCode(const int num);
+void processGCode(const cmd_param param);
+void processMCode(const cmd_param param);
+void processTCode(const cmd_param param);
 
 
 // Definitions
@@ -107,7 +110,6 @@ void parseCode(const char* const data)
 {
     // Get Letter and Number
     char letter = '\0';
-    int num = 0;
     float value = 0;
 
     cmd_param param;
@@ -126,8 +128,9 @@ void parseCode(const char* const data)
 //            continue;
 //        }
 
-        if( (*chrPtr >= 'A')
-                && (*chrPtr <= 'Z') ) // Is a Valid GCode letter
+        if( ( (*chrPtr >= 'A')
+              && (*chrPtr <= 'Z') )
+                || (*chrPtr == '*') ) // Is a Valid GCode letter
         {
 //            puts("Valid letter found\n");
             letter = *chrPtr;
@@ -163,6 +166,12 @@ void parseCode(const char* const data)
                         break;
                     case 'M': //
                         param.m = value;
+                        break;
+                    case 'N': //
+                        param.n = value;
+                        break;
+                    case '*': //
+                        param.checksum = value;
                         break;
 
                     case 'P': // P = Serves as parameter address for various G and M codes
@@ -218,6 +227,19 @@ void parseCode(const char* const data)
 //    printf("z=%f\n", param.z);
 
 
+    if (param.g != 0)
+    {
+        processGCode(param);
+    }
+    else if (param.m != 0)
+    {
+        processMCode(param);
+    }
+    else if (param.t != 0)
+    {
+        processTCode(param);
+    }
+/*
     sscanf(data, "%c%d", &letter, &num);
 
     switch (letter)
@@ -260,18 +282,25 @@ void parseCode(const char* const data)
         default:
             break;
     }
+    */
 }
 
-void processGCode(int num, const cmd_param param)
+void processGCode(const cmd_param param)
 {
-    switch (num)
+    switch ((int)param.g)
     {
         case 0: // G0 = Rapid move
             puts("ok\n");
             break;
         case 1: // G1 = Controlled move
-            stepper_move(param.x);
-            puts("ok\n");
+            if (param.x != 0.0)
+            {
+                stepper_move(param.x);
+            }
+            else
+            {
+                puts("ok\n");
+            }
             break;
         case 4: // G4 = Dwell
             puts("ok\n");
@@ -286,6 +315,7 @@ void processGCode(int num, const cmd_param param)
             puts("ok\n");
             break;
         case 28: // G28 = Move to Origin
+            stepper_reset(); /// \todo change to real move to origin
             puts("ok\n");
             break;
         case 29:
@@ -295,9 +325,11 @@ void processGCode(int num, const cmd_param param)
             puts("ok\n");
             break;
         case 90: // G90 = Set to Absolute Positioning
+            stepper_set_absolute();
             puts("ok\n");
             break;
         case 91: // G91 = Set to Relative Positioning
+            stepper_set_relative();
             puts("ok\n");
             break;
         case 92: // G92 = Set Position
@@ -309,9 +341,9 @@ void processGCode(int num, const cmd_param param)
     }
 }
 
-void processMCode(const int num, const char* const data)
+void processMCode(const cmd_param param)
 {
-    switch(num)
+    switch((int)param.m)
     {
         case 0: // M0 = Stop
         case 1: // M1 = Sleep
@@ -360,7 +392,8 @@ void processMCode(const int num, const char* const data)
         case 102: // M102 = Turn extruder 1 on Reverse
         case 103: // M103 = Turn all extruders off / Extruder Retraction
         case 104: // M104 = Set Extruder Temperature
-            sscanf(data, "M104 S%d", &state.extruderTempOrder);
+            //sscanf(data, "M104 S%d", &state.extruderTempOrder);
+            state.extruderTempOrder = param.s;
             puts("ok\n");
             break;
         case 105: // M105 = Get Extruder Temperature
@@ -395,7 +428,8 @@ void processMCode(const int num, const char* const data)
             puts("ok\n");
             break;
         case 140: // M140 = Bed Temperature (Fast)
-            sscanf(data, "M140 S%d", &state.bedTempOrder);
+            //sscanf(data, "M140 S%d", &state.bedTempOrder);
+            state.bedTempOrder = param.s;
             puts("ok\n");
             break;
         case 141: // M141 = Chamber Temperature (Fast)
@@ -439,9 +473,9 @@ void processMCode(const int num, const char* const data)
     }
 }
 
-void processTCode(const int num)
+void processTCode(const cmd_param param)
 {
-    switch (num)
+    switch ((int)param.t)
     {
         //case : // T = Select Tool
         default:

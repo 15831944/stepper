@@ -14,4 +14,8 @@ void stepper_set_backward(void);
 bool StepperIsForward(void);
 uint32_t getStepperPos(void);
 
+void stepper_set_absolute(void);
+void stepper_set_relative(void);
+void stepper_reset(void);
+
 #endif // STEPPER_H

@@ -10,22 +10,32 @@ uint32_t freq_current = 1;
 int32_t position_current = 0;
 int32_t position_request = 0;
 
+
+
+
 // consts
 //const float MICROSTEPS = 16;
 #define MICROSTEPS 16
 const float mm2steps = MICROSTEPS * 200.0 / (8.0 * 5.0); // microstep ratio * NbSteps / (Ntooth * PitchBelt)
+
+typedef enum
+{
+    MOVE_Relative = 0,
+    MOVE_Absolute
+} MOVE_MODE;
 
 
 typedef enum
 {
     STEPPER_Stopped = 0,
     STEPPER_Forward,
-    STEPPER_Backward
-
+    STEPPER_Backward,
+    STEPPER_Waiting
 } STEPPER_DIR;
 
 
 STEPPER_DIR direction = STEPPER_Forward;
+MOVE_MODE mode = MOVE_Relative;
 
 void TIM2_IRQHandler(void)
 {
@@ -46,6 +56,10 @@ void TIM2_IRQHandler(void)
         else
         {
             // Stop
+            if (direction != STEPPER_Stopped)
+            {
+                puts("ok\n"); // Only once when it happens
+            }
             direction = STEPPER_Stopped;
         }
 
@@ -106,12 +120,21 @@ void stepper_init()
 
 void stepper_move(float delta)
 {
-    position_request += 2 * delta * mm2steps; // x2 because of using toggle in interrupts (2 interrupts for one pulse)
+    if (mode == MOVE_Absolute)
+    {
+        position_request = 2 * delta * mm2steps; // x2 because of using toggle in interrupts (2 interrupts for one pulse)
+    }
+    else
+    {
+        position_request += 2 * delta * mm2steps; // x2 because of using toggle in interrupts (2 interrupts for one pulse)
+    }
+
+    direction = STEPPER_Waiting;
 }
 
 void stepper_stop()
 {
-    direction == STEPPER_Stopped;
+    direction = STEPPER_Stopped;
     position_request = position_current;
 }
 
@@ -136,4 +159,21 @@ bool StepperIsForward()
 uint32_t getStepperPos()
 {
     return position_current;
+}
+
+void stepper_set_absolute()
+{
+    mode = MOVE_Absolute;
+}
+
+void stepper_set_relative()
+{
+    mode = MOVE_Relative;
+}
+
+void stepper_reset()
+{
+    direction = STEPPER_Stopped;
+    position_current = 0;
+    position_request = 0;
 }
