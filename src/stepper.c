@@ -40,7 +40,7 @@ MOVE_MODE mode = MOVE_Relative;
 void TIM2_IRQHandler(void)
 {
 
-    if (TIM2->SR & TIM_SR_UIF)
+    if (TIM_GetITStatus(TIM2, TIM_IT_Update) == SET)
     {
 
         if (position_current < position_request)
@@ -82,28 +82,33 @@ void TIM2_IRQHandler(void)
             GPIO_ToggleBits(GPIOE, GPIO_Pin_11);
         }
 
-        //TIM2->ARR = freq_current;
-        TIM2->ARR = (uint32_t) ( (float)0x1000 / (float) freq_current) + 3;
+       TIM_ARRPreloadConfig(TIM2, (uint32_t) ( (float)0x1000 / (float) freq_current) + 3);
     }
-    TIM2->SR = 0x0; // reset the status register
+    TIM_ClearITPendingBit(TIM2, TIM_IT_Update);
 }
 
 
 void stepper_init()
 {
-    // Timer 2 : stepper
-    RCC->APB1ENR |= RCC_APB1ENR_TIM2EN; // enable TIM2 clock
-
-    NVIC->ISER[0] |= 1 << (TIM2_IRQn); // enable the TIM2 IRQ
-
-    TIM2->PSC = 0x0008; // no prescaler, timer counts up in sync with the peripheral clock
-    TIM2->DIER |= TIM_DIER_UIE; // enable update interrupt
-    TIM2->ARR = 0x1000; // count to 1 (autoreload value 1)
     freq_current = 1;
     freq_request = 1;
 
-    TIM2->CR1 |= TIM_CR1_ARPE | TIM_CR1_CEN; // autoreload on, counter enabled
-    TIM2->EGR = 1; // trigger update event to reload timer registers
+    // Timer 2 : stepper
+    RCC_APB1PeriphClockCmd(RCC_APB1ENR_TIM2EN, ENABLE);
+
+    TIM_TimeBaseInitTypeDef timeBaseInitStruct;
+    timeBaseInitStruct.TIM_CounterMode = TIM_CounterMode_Up;
+    timeBaseInitStruct.TIM_ClockDivision = TIM_CKD_DIV1;
+    timeBaseInitStruct.TIM_Prescaler = 8;
+    timeBaseInitStruct.TIM_Period = 0x1000;
+    timeBaseInitStruct.TIM_RepetitionCounter = 0; // Only TIM1 & TIM8
+
+    TIM_TimeBaseInit(TIM2, &timeBaseInitStruct);
+
+    TIM_ITConfig(TIM2, TIM_IT_Update, ENABLE);
+    NVIC_EnableIRQ(TIM2_IRQn);
+
+    TIM_Cmd(TIM2, ENABLE);
 
     // Output
     RCC_AHB1PeriphClockCmd(RCC_AHB1Periph_GPIOE, ENABLE);
@@ -112,10 +117,9 @@ void stepper_init()
     GPIO_InitStructure.GPIO_Mode = GPIO_Mode_OUT;
     GPIO_InitStructure.GPIO_PuPd = GPIO_PuPd_NOPULL;
     GPIO_InitStructure.GPIO_Pin = GPIO_Pin_11 | GPIO_Pin_13;
+
     GPIO_Init(GPIOE, &GPIO_InitStructure);
 
-//    RCC->AHB1ENR |= RCC_AHB1ENR_GPIOEEN; // enable the clock to GPIOE
-//    GPIOE->MODER |= (1 << (2*11));
 }
 
 void stepper_move(float delta)
