@@ -7,7 +7,7 @@
 
 
 #include "stepper.h"
-
+#include "temp.h"
 
 // Enums
 typedef enum
@@ -32,8 +32,8 @@ typedef struct
 
     // Peripherals state
     bool spindleOn; /// \todo to add : coolant, vacuum
-    int extruderTempOrder;
-    int bedTempOrder;
+    float extruderTempOrder;
+    float bedTempOrder;
 
     /// \todo to be complete with all other commands
 } gcode_state;
@@ -90,7 +90,6 @@ void parseCode(const char* const data);
 void processGCode(const cmd_param param);
 void processMCode(const cmd_param param);
 void processTCode(const cmd_param param);
-
 
 // Definitions
 
@@ -397,7 +396,8 @@ void processMCode(const cmd_param param)
             puts("ok\n");
             break;
         case 105: // M105 = Get Extruder Temperature
-            printf("ok T:%d B:%d\n", state.extruderTempOrder, state.bedTempOrder);
+//            printf("ok T:%d B:%d\n", temp_get_extruder(), state.bedTempOrder);
+            printf("ok T:%.2f B:%.2f\n", state.extruderTempOrder, state.bedTempOrder);
             break;
         case 106: // M106 = Fan On
         case 107: // M107 = Fan Off
@@ -484,3 +484,8 @@ void processTCode(const cmd_param param)
     }
 }
 
+void gcode_setExtruderTempMeasure(float temp)
+{
+    /// \todo replace order by measure
+    state.extruderTempOrder = temp;
+}
