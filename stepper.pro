@@ -53,3 +53,6 @@ SOURCES += usb/usbd_cdc_vcp.c \
         usb/stm32f4xx_it.c \
         usb/syscalls.c
 
+OTHER_FILES += \
+    doc/calc_thermistance_coeff.py
+

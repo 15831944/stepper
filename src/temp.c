@@ -164,10 +164,16 @@ float convertAdcTemperature(uint16_t raw)
     float voltage = ref_voltage*raw/4096; // Volts
     float res = voltage*ref_res/(ref_voltage-voltage); // Ohms
 
-    const float B = 4088.1547092533;
-    const float ln_r_inf = -2.3087367665;
+// Beta Equation
+//    const float B = 4088.1547092533;
+//    const float ln_r_inf = -2.3087367665;
+//    float temp = B / (logf(res) - ln_r_inf) - 273; // °C
 
-    float temp = B / (logf(res) - ln_r_inf) - 273; // °C
+    // Full Steinhart Hart equation
+    float A = 0.000722752911679;
+    float B = 0.000216691739579;
+    float C = 8.91392905583e-08;
+    float temp = 1/ (A + B * logf(res) + C * powf(logf(res),3) ) - 273.15;
 
     return temp;
 }
