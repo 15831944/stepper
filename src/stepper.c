@@ -4,19 +4,8 @@
 
 #include <stdio.h>
 
-uint32_t freq_request = 1;
-uint32_t freq_current = 1;
-
-// Stepper A
-int32_t STEPA_position_current = 0;
-int32_t STEPA_position_request = 0;
-
-// Stepper B
-int32_t STEPB_position_current = 0;
-int32_t STEPB_position_request = 0;
-
-
 // consts
+/// \todo move these constants in the stepper state structure to allow per stepper configuration
 //const float MICROSTEPS = 16;
 #define MICROSTEPS 16
 const float mm2steps = MICROSTEPS * 200.0 / (8.0 * 5.0); // microstep ratio * NbSteps / (Ntooth * PitchBelt)
@@ -37,15 +26,63 @@ typedef enum
 } STEPPER_DIR;
 
 
-STEPPER_DIR STEPA_direction = STEPPER_Forward;
-STEPPER_DIR STEPB_direction = STEPPER_Forward;
+typedef enum
+{
+    AXIS_X = 0,
+    AXIS_Y,
+    AXIS_Z,
+    AXIS_E,
+    AXIS_NUM // For loops, contains the number of axis on this machine
+} STEPPER_AXIS;
 
+typedef struct
+{
+    STEPPER_DIR direction;
+    uint32_t freq_request;
+    uint32_t freq_current;
+    int32_t position_request;
+    int32_t position_current;
+} STEPPER_STATE;
 
+STEPPER_STATE stepper[4] = {
+    {
+        .direction = STEPPER_Stopped,
+        .freq_request = 1,
+        .freq_current = 1,
+        .position_request = 0,
+        .position_current = 0
+    },
+
+    {
+        .direction = STEPPER_Stopped,
+        .freq_request = 1,
+        .freq_current = 1,
+        .position_request = 0,
+        .position_current = 0
+    },
+
+    {
+        .direction = STEPPER_Stopped,
+        .freq_request = 1,
+        .freq_current = 1,
+        .position_request = 0,
+        .position_current = 0
+    },
+
+    {
+        .direction = STEPPER_Stopped,
+        .freq_request = 1,
+        .freq_current = 1,
+        .position_request = 0,
+        .position_current = 0
+    }
+};
+
+/// \todo move "move mode" in the stepper state structure to allow per stepper configuration
 MOVE_MODE mode = MOVE_Relative;
 
 
-void STEPA_move_finished(void);
-void STEPB_move_finished(void);
+void move_finished(STEPPER_AXIS axis);
 
 /// \todo remove, debug only
 extern bool g_Led2State;
@@ -58,49 +95,49 @@ void TIM2_IRQHandler(void)
     if (TIM_GetITStatus(TIM2, TIM_IT_Update) == SET)
     {
 
-        if (STEPA_position_current < STEPA_position_request)
+        if (stepper[AXIS_X].position_current < stepper[AXIS_X].position_request)
         {
             // Go Forward
-            STEPA_direction = STEPPER_Forward;
+            stepper[AXIS_X].direction = STEPPER_Forward;
         }
-        else if (STEPA_position_current > STEPA_position_request)
+        else if (stepper[AXIS_X].position_current > stepper[AXIS_X].position_request)
         {
             // Go Backward
-            STEPA_direction = STEPPER_Backward;
+            stepper[AXIS_X].direction = STEPPER_Backward;
         }
         else
         {
             // Stop
-            if (STEPA_direction != STEPPER_Stopped)
+            if (stepper[AXIS_X].direction != STEPPER_Stopped)
             {
-                STEPA_move_finished();
+                move_finished(AXIS_X);
             }
-            STEPA_direction = STEPPER_Stopped;
+            stepper[AXIS_X].direction = STEPPER_Stopped; /// \todo should be part of the move_finished function.
         }
 
 
-        if (STEPA_direction == STEPPER_Forward)
+        if (stepper[AXIS_X].direction == STEPPER_Forward)
         {
             GPIO_WriteBit(GPIOE, GPIO_Pin_8, Bit_SET);
             GPIO_WriteBit(GPIOE, GPIO_Pin_12, Bit_SET); /// \todo remove : debug only
-            STEPA_position_current++;
+            stepper[AXIS_X].position_current++;
             g_Led2State = 1;
         }
-        else if (STEPA_direction == STEPPER_Backward)
+        else if (stepper[AXIS_X].direction == STEPPER_Backward)
         {
             GPIO_WriteBit(GPIOE, GPIO_Pin_8, Bit_RESET);
             GPIO_WriteBit(GPIOE, GPIO_Pin_12, Bit_RESET); /// \todo remove : debug only
-            STEPA_position_current--;
+            stepper[AXIS_X].position_current--;
             g_Led2State = 0;
         }
 
-        if (STEPA_direction != STEPPER_Stopped)
+        if (stepper[AXIS_X].direction != STEPPER_Stopped)
         {
             GPIO_ToggleBits(GPIOE, GPIO_Pin_7);
             GPIO_ToggleBits(GPIOE, GPIO_Pin_11); /// \todo remove : debug only
         }
 
-        TIM_ARRPreloadConfig(TIM2, (uint32_t) ( (float)0x1000 / (float) freq_current) + 3);
+        TIM_ARRPreloadConfig(TIM2, (uint32_t) ( (float)0x1000 / (float) stepper[AXIS_X].freq_current) + 3);
     }
     TIM_ClearITPendingBit(TIM2, TIM_IT_Update);
 }
@@ -111,48 +148,48 @@ void TIM5_IRQHandler(void)
     if (TIM_GetITStatus(TIM5, TIM_IT_Update) == SET)
     {
 
-        if (STEPB_position_current < STEPB_position_request)
+        if (stepper[AXIS_Y].position_current < stepper[AXIS_Y].position_request)
         {
             // Go Forward
-            STEPB_direction = STEPPER_Forward;
+            stepper[AXIS_Y].direction = STEPPER_Forward;
         }
-        else if (STEPB_position_current > STEPB_position_request)
+        else if (stepper[AXIS_Y].position_current > stepper[AXIS_Y].position_request)
         {
             // Go Backward
-            STEPB_direction = STEPPER_Backward;
+            stepper[AXIS_Y].direction = STEPPER_Backward;
         }
         else
         {
             // Stop
-            if (STEPB_direction != STEPPER_Stopped)
+            if (stepper[AXIS_Y].direction != STEPPER_Stopped)
             {
-                STEPB_move_finished();
+                move_finished(AXIS_Y);
             }
-            STEPB_direction = STEPPER_Stopped;
+            stepper[AXIS_Y].direction = STEPPER_Stopped;
         }
 
 
-        if (STEPB_direction == STEPPER_Forward)
+        if (stepper[AXIS_Y].direction == STEPPER_Forward)
         {
             GPIO_WriteBit(GPIOE, GPIO_Pin_10, Bit_SET);
             GPIO_WriteBit(GPIOE, GPIO_Pin_14, Bit_SET); /// \todo remove : debug only
-            STEPB_position_current++;
+            stepper[AXIS_Y].position_current++;
             g_Led4State = 1;
         }
-        else if (STEPB_direction == STEPPER_Backward)
+        else if (stepper[AXIS_Y].direction == STEPPER_Backward)
         {
             GPIO_WriteBit(GPIOE, GPIO_Pin_10, Bit_RESET);
             GPIO_WriteBit(GPIOE, GPIO_Pin_14, Bit_RESET); /// \todo remove : debug only
-            STEPB_position_current--;
+            stepper[AXIS_Y].position_current--;
             g_Led4State = 0;
         }
 
-        if (STEPB_direction != STEPPER_Stopped)
+        if (stepper[AXIS_Y].direction != STEPPER_Stopped)
         {
             GPIO_ToggleBits(GPIOE, GPIO_Pin_9);
             GPIO_ToggleBits(GPIOE, GPIO_Pin_13); /// \todo remove : debug only
         }
-       TIM_ARRPreloadConfig(TIM5, (uint32_t) ( (float)0x1000 / (float) freq_current) + 3);
+       TIM_ARRPreloadConfig(TIM5, (uint32_t) ( (float)0x1000 / (float) stepper[AXIS_Y].freq_current) + 3);
     }
     TIM_ClearITPendingBit(TIM5, TIM_IT_Update);
 }
@@ -170,27 +207,34 @@ void TIM3_IRQHandler(void)
 }
 */
 
-void STEPA_move_finished()
+void move_finished(STEPPER_AXIS axis)
 {
-    if (STEPB_direction == STEPPER_Stopped)
+    bool all_stopped = true;
+    /// \todo add the check that all other movements are stopped
+    for (int i=0; i<AXIS_NUM; i++)
     {
-       puts("ok\n"); // Only once when it happens
+        if ( (i != axis ) // Skip the current axis, to only check if all other have finished
+            && (stepper[i].direction != STEPPER_Stopped) ) // If one stepper has not finished, then notify it and exit
+        {
+            all_stopped = false;
+            break;
+        }
     }
-}
 
-void STEPB_move_finished()
-{
-    if (STEPA_direction == STEPPER_Stopped)
+    if (all_stopped)
     {
-       puts("ok\n"); // Only once when it happens
+        puts("ok\n"); // Print only once when the last move finishes
     }
 }
 
 
 void stepper_init()
 {
-    freq_current = 1;
-    freq_request = 1;
+    for (int i=0; i<AXIS_NUM; i++)
+    {
+        stepper[i].freq_current = 1;
+        stepper[i].freq_request = 1;
+    }
 
     // Timer 2 : stepper A
     RCC_APB1PeriphClockCmd(RCC_APB1ENR_TIM2EN, ENABLE);
@@ -265,59 +309,36 @@ void stepper_move(float deltaA, float deltaB)
 {
     if (mode == MOVE_Absolute)
     {
-        STEPA_position_request = 2 * deltaA * mm2steps; // x2 because of using toggle in interrupts (2 interrupts for one pulse)
+        stepper[AXIS_X].position_request = 2 * deltaA * mm2steps; // x2 because of using toggle in interrupts (2 interrupts for one pulse)
     }
     else
     {
-        STEPA_position_request += 2 * deltaA * mm2steps; // x2 because of using toggle in interrupts (2 interrupts for one pulse)
+        stepper[AXIS_X].position_request += 2 * deltaA * mm2steps; // x2 because of using toggle in interrupts (2 interrupts for one pulse)
     }
 
-    STEPA_direction = STEPPER_Waiting;
+    stepper[AXIS_X].direction = STEPPER_Waiting;
 
     if (mode == MOVE_Absolute)
     {
-        STEPB_position_request = 2 * deltaB * mm2steps; // x2 because of using toggle in interrupts (2 interrupts for one pulse)
+        stepper[AXIS_Y].position_request = 2 * deltaB * mm2steps; // x2 because of using toggle in interrupts (2 interrupts for one pulse)
     }
     else
     {
-        STEPB_position_request += 2 * deltaB * mm2steps; // x2 because of using toggle in interrupts (2 interrupts for one pulse)
+        stepper[AXIS_Y].position_request += 2 * deltaB * mm2steps; // x2 because of using toggle in interrupts (2 interrupts for one pulse)
     }
 
-    STEPB_direction = STEPPER_Waiting;
+    stepper[AXIS_Y].direction = STEPPER_Waiting;
 }
 
 void stepper_stop()
 {
-    STEPA_direction = STEPPER_Stopped;
-    STEPA_position_request = STEPA_position_current;
+    stepper[AXIS_X].direction = STEPPER_Stopped;
+    stepper[AXIS_X].position_request = stepper[AXIS_X].position_current;
 
-    STEPB_direction = STEPPER_Stopped;
-    STEPB_position_request = STEPB_position_current;
+    stepper[AXIS_Y].direction = STEPPER_Stopped;
+    stepper[AXIS_Y].position_request = stepper[AXIS_Y].position_current;
 }
 
-/*
-void stepper_set_forward()
-{
-    STEPA_direction = STEPPER_Forward;
-    printf("FW\n");
-}
-
-void stepper_set_backward()
-{
-    STEPA_direction = STEPPER_Backward;
-    printf("BW\n");
-}
-
-bool StepperIsForward()
-{
-    return (STEPA_direction == STEPPER_Forward);
-}
-
-uint32_t getStepperPos()
-{
-    return STEPA_position_current;
-}
-*/
 void stepper_set_absolute()
 {
     mode = MOVE_Absolute;
@@ -330,11 +351,11 @@ void stepper_set_relative()
 
 void stepper_reset()
 {
-    STEPA_direction = STEPPER_Stopped;
-    STEPA_position_current = 0;
-    STEPA_position_request = 0;
+    stepper[AXIS_X].direction = STEPPER_Stopped;
+    stepper[AXIS_X].position_current = 0;
+    stepper[AXIS_X].position_request = 0;
 
-    STEPB_direction = STEPPER_Stopped;
-    STEPB_position_current = 0;
-    STEPB_position_request = 0;
+    stepper[AXIS_Y].direction = STEPPER_Stopped;
+    stepper[AXIS_Y].position_current = 0;
+    stepper[AXIS_Y].position_request = 0;
 }
