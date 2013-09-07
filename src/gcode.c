@@ -292,9 +292,11 @@ void processGCode(const cmd_param param)
             puts("ok\n");
             break;
         case 1: // G1 = Controlled move
-            if ( (param.x != 0.0) || (param.y != 0.0) )
+            if ( (param.x != 0.0) || (param.y != 0.0) || (param.z != 0.0) || (param.e != 0.0) )
             {
-                stepper_move(param.x, param.y);
+                /// \todo add support for feedrate (F code)
+                float delta[AXIS_NUM] = {param.x, param.y, param.z, param.e};
+                stepper_move(delta);
             }
 //            if ( param.x != 0.0 )
 //            {
