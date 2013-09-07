@@ -7,6 +7,7 @@
 
 float convertAdcTemperature(uint16_t raw);
 
+/*
 void TIM3_IRQHandler(void)
 {
 
@@ -17,7 +18,7 @@ void TIM3_IRQHandler(void)
     }
     TIM_ClearITPendingBit(TIM3, TIM_IT_CC1);
 }
-
+*/
 
 void ADC_IRQHandler(void)
 {
@@ -41,6 +42,7 @@ void ADC_IRQHandler(void)
 
 void temp_init(void)
 {
+/*
     // Analog Channel 1 on PA1
     RCC_AHB1PeriphClockCmd(RCC_AHB1Periph_GPIOA, ENABLE);
 
@@ -52,7 +54,7 @@ void temp_init(void)
     GPIO_Init(GPIOA, &GPIO_InitStructure);
 
 
-    // Timer 3 : stepper
+    // Timer 3 : temp measurements
     RCC_APB1PeriphClockCmd(RCC_APB1ENR_TIM3EN, ENABLE);
 
     TIM_TimeBaseInitTypeDef timeBaseInitStruct;
@@ -112,7 +114,7 @@ void temp_init(void)
     ADC_EOCOnEachRegularChannelCmd(ADC1, ENABLE);
 
     ADC_Cmd(ADC1, ENABLE);
-
+*/
 
 
 //    /* Enable ADC1 reset calibaration register */
@@ -141,6 +143,7 @@ int temp_get_extruder(void)
     // R/T curve 8304
     // B25/100 = 4092 K
 
+    /*
     ADC_RegularChannelConfig(ADC1, ADC_Channel_0, 1, ADC_SampleTime_480Cycles);
     // Start the conversion
     ADC_SoftwareStartConv(ADC1);
@@ -150,6 +153,8 @@ int temp_get_extruder(void)
     ADC_ClearFlag(ADC1, ADC_FLAG_EOC);
     // Get the conversion value
     return ADC_GetConversionValue(ADC1)/10;
+    */
+    return 0;
 }
 
 int temp_get_bed(void)

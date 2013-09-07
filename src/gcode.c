@@ -292,10 +292,14 @@ void processGCode(const cmd_param param)
             puts("ok\n");
             break;
         case 1: // G1 = Controlled move
-            if (param.x != 0.0)
+            if ( (param.x != 0.0) || (param.y != 0.0) )
             {
-                stepper_move(param.x);
+                stepper_move(param.x, param.y);
             }
+//            if ( param.x != 0.0 )
+//            {
+//                stepper_move(param.x, param.y);
+//            }
             else
             {
                 puts("ok\n");

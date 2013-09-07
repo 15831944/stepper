@@ -4,6 +4,10 @@
 
 #include "stepper.h"
 
+bool g_Led2State = false;
+bool g_Led3State = false;
+bool g_Led4State = false;
+
 void TIM4_IRQHandler(void)
 {
 
@@ -35,7 +39,7 @@ void TIM4_IRQHandler(void)
       //TIM4->CCR4 = 0x100 - TIM4->CCR1;
       //TIM4->CCR4 = TIM4->CCR1;
 
-      if (StepperIsForward() == true)
+      if (g_Led2State == true)
       {
           TIM4->CCR2 = 0x100;
       }
@@ -44,27 +48,56 @@ void TIM4_IRQHandler(void)
           TIM4->CCR2 = 0x0;
       }
 
-      if (GPIO_ReadInputDataBit(GPIOE, GPIO_Pin_7) == Bit_SET)
+      if (g_Led3State == true)
       {
-          TIM4->CCR3 = 0x100;//0x100 - TIM4->CCR1;
+          TIM4->CCR3 = 0x100;
       }
       else
       {
-          TIM4->CCR3 = 0x0;//TIM4->CCR3 = TIM4->CCR1;
+          TIM4->CCR3 = 0x0;
       }
 
-      if (GPIO_ReadInputDataBit(GPIOE, GPIO_Pin_9) == Bit_SET)
+      if (g_Led4State == true)
       {
-          TIM4->CCR4 = 0x100;//0x100 - TIM4->CCR1;
+          TIM4->CCR4 = 0x100;
       }
       else
       {
-          TIM4->CCR4 = 0x0;TIM4->CCR1;
+          TIM4->CCR4 = 0x0;
       }
+
+
+//      if (StepperIsForward() == true)
+//      {
+//          TIM4->CCR2 = 0x100;
+//      }
+//      else
+//      {
+//          TIM4->CCR2 = 0x0;
+//      }
+
+//      if (GPIO_ReadInputDataBit(GPIOE, GPIO_Pin_7) == Bit_SET)
+//      {
+//          TIM4->CCR3 = 0x100;//0x100 - TIM4->CCR1;
+//      }
+//      else
+//      {
+//          TIM4->CCR3 = 0x0;//TIM4->CCR3 = TIM4->CCR1;
+//      }
+
+//      if (GPIO_ReadInputDataBit(GPIOE, GPIO_Pin_9) == Bit_SET)
+//      {
+//          TIM4->CCR4 = 0x100;//0x100 - TIM4->CCR1;
+//      }
+//      else
+//      {
+//          TIM4->CCR4 = 0x0;TIM4->CCR1;
+//      }
   }
 
   TIM4->SR = 0x0; // reset the status register
 }
+
 
 void leds_init()
 {

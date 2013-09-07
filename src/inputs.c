@@ -13,32 +13,17 @@ void EXTI0_IRQHandler(void)
 
 void EXTI9_5_IRQHandler(void)
 {
-//    TIM4->CCR1 = 0x001;
-//    TIM4->CCR2 = TIM4->CCR3 = TIM4->CCR4 = TIM4->CCR1;
 
-//    TIM2->ARR -= (TIM2->ARR / 20);
-
-//    if (GPIO_ReadInputDataBit(GPIOE, GPIO_Pin_7) == Bit_SET)
-//    {
-//        stepper_set_forward();
-//    }
-
-//    else if (GPIO_ReadInputDataBit(GPIOE, GPIO_Pin_9) == Bit_SET)
-//    {
-//        stepper_set_backward();
-//    }
-
-    //EXTI->PR |= EXTI_PR_PR0; // reset the interrupt
     if (EXTI_GetFlagStatus(EXTI_Line7) == SET)
     {
         EXTI_ClearITPendingBit(EXTI_Line7);
-        stepper_stop();//stepper_set_forward();
+//        stepper_stop();//stepper_set_forward();
     }
 
     if (EXTI_GetFlagStatus(EXTI_Line9) == SET)
     {
         EXTI_ClearITPendingBit(EXTI_Line9);
-        stepper_stop();//stepper_set_backward();
+//        stepper_stop();//stepper_set_backward();
     }
 
 }
@@ -46,6 +31,8 @@ void EXTI9_5_IRQHandler(void)
 
 void inputs_init()
 {
+/*
+
     // External interrupt on PE9
     RCC_APB2PeriphClockCmd(RCC_APB2Periph_SYSCFG, ENABLE);
     RCC_AHB1PeriphClockCmd(RCC_AHB1Periph_GPIOE, ENABLE);
@@ -99,4 +86,6 @@ void inputs_init()
     NVIC_InitStructureE7.NVIC_IRQChannelSubPriority = 0x0F;
     NVIC_InitStructureE7.NVIC_IRQChannelCmd = ENABLE;
     NVIC_Init(&NVIC_InitStructureE7);
+
+*/
 }

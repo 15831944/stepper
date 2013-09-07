@@ -22,10 +22,10 @@ int main(void)
     sys_init();
     leds_init();
     stepper_init();
-    inputs_init();
+//    inputs_init();
     usb_init();
     gcode_init();
-    temp_init();
+//    temp_init();
 
     while (1)
     {
