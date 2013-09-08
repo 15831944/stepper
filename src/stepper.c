@@ -29,10 +29,18 @@ typedef enum
 typedef struct
 {
     // Config
+    uint32_t step_AHB1Periph;
     GPIO_TypeDef* step_port;
     uint16_t step_pin;
+    uint32_t dir_AHB1Periph;
     GPIO_TypeDef* dir_port;
     uint16_t dir_pin;
+
+    //
+    TIM_TypeDef* timer;
+    uint32_t timerAPB1Periph;
+    uint32_t timerAPB2Periph; /// \todo make some function to abstract more easily the timer (should only need to say which timer to use, not provide all fields directly related to it...)
+    IRQn_Type timerIrq;
 
     // move state
     STEPPER_DIR direction;
@@ -44,10 +52,16 @@ typedef struct
 
 STEPPER_STATE stepper[4] = {
     {
+        .step_AHB1Periph = RCC_AHB1Periph_GPIOE,
         .step_port = GPIOE,
         .step_pin = GPIO_Pin_7,
+        .dir_AHB1Periph = RCC_AHB1Periph_GPIOE,
         .dir_port = GPIOE,
         .dir_pin = GPIO_Pin_8,
+        .timer = TIM10,
+        .timerAPB1Periph = 0,
+        .timerAPB2Periph = RCC_APB2ENR_TIM10EN,
+        .timerIrq = TIM1_UP_TIM10_IRQn,
         .direction = STEPPER_Stopped,
         .freq_request = 1,
         .freq_current = 1,
@@ -56,10 +70,16 @@ STEPPER_STATE stepper[4] = {
     },
 
     {
+        .step_AHB1Periph = RCC_AHB1Periph_GPIOE,
         .step_port = GPIOE,
         .step_pin = GPIO_Pin_9,
+        .dir_AHB1Periph = RCC_AHB1Periph_GPIOE,
         .dir_port = GPIOE,
         .dir_pin = GPIO_Pin_10,
+        .timer = TIM11,
+        .timerAPB1Periph = 0,
+        .timerAPB2Periph = RCC_APB2ENR_TIM11EN,
+        .timerIrq = TIM1_TRG_COM_TIM11_IRQn,
         .direction = STEPPER_Stopped,
         .freq_request = 1,
         .freq_current = 1,
@@ -68,10 +88,16 @@ STEPPER_STATE stepper[4] = {
     },
 
     {
+        .step_AHB1Periph = RCC_AHB1Periph_GPIOE,
         .step_port = GPIOE,
         .step_pin = GPIO_Pin_11,
+        .dir_AHB1Periph = RCC_AHB1Periph_GPIOE,
         .dir_port = GPIOE,
         .dir_pin = GPIO_Pin_12,
+        .timer = TIM13,
+        .timerAPB1Periph = RCC_APB1ENR_TIM13EN,
+        .timerAPB2Periph = 0,
+        .timerIrq = TIM8_UP_TIM13_IRQn,
         .direction = STEPPER_Stopped,
         .freq_request = 1,
         .freq_current = 1,
@@ -80,10 +106,16 @@ STEPPER_STATE stepper[4] = {
     },
 
     {
+        .step_AHB1Periph = RCC_AHB1Periph_GPIOE,
         .step_port = GPIOE,
         .step_pin = GPIO_Pin_13,
+        .dir_AHB1Periph = RCC_AHB1Periph_GPIOE,
         .dir_port = GPIOE,
         .dir_pin = GPIO_Pin_14,
+        .timer = TIM14,
+        .timerAPB1Periph = RCC_APB1ENR_TIM14EN,
+        .timerAPB2Periph = 0,
+        .timerIrq = TIM8_TRG_COM_TIM14_IRQn,
         .direction = STEPPER_Stopped,
         .freq_request = 1,
         .freq_current = 1,
@@ -98,96 +130,85 @@ MOVE_MODE mode = MOVE_Relative;
 
 void move_finished(STEPPER_AXIS axis);
 void Process_Stepper(STEPPER_AXIS axis); /// Function to call on interrupt to process the new step and the associated state machine
+void init_stepper(STEPPER_AXIS axis);
 
 /// \todo remove, debug only
-extern bool g_Led2State;
-extern bool g_Led3State;
-extern bool g_Led4State;
+extern bool g_LedState[4];
 
-void Process_Stepper(STEPPER_AXIS axis)
+inline void Process_Stepper(STEPPER_AXIS axis)
 {
-    if (stepper[axis].position_current < stepper[axis].position_request)
+
+    if (TIM_GetITStatus(stepper[axis].timer, TIM_IT_Update) == SET)
     {
-        // Go Forward
-        stepper[axis].direction = STEPPER_Forward;
-    }
-    else if (stepper[axis].position_current > stepper[axis].position_request)
-    {
-        // Go Backward
-        stepper[axis].direction = STEPPER_Backward;
-    }
-    else
-    {
-        // Stop
+        if (stepper[axis].position_current < stepper[axis].position_request)
+        {
+            // Go Forward
+            stepper[axis].direction = STEPPER_Forward;
+        }
+        else if (stepper[axis].position_current > stepper[axis].position_request)
+        {
+            // Go Backward
+            stepper[axis].direction = STEPPER_Backward;
+        }
+        else
+        {
+            // Stop
+            if (stepper[axis].direction != STEPPER_Stopped)
+            {
+                move_finished(axis);
+            }
+            stepper[axis].direction = STEPPER_Stopped; /// \todo should be part of the move_finished function.
+        }
+
+
+        if (stepper[axis].direction == STEPPER_Forward)
+        {
+            GPIO_WriteBit(stepper[axis].dir_port, stepper[axis].dir_pin, Bit_SET);
+            stepper[axis].position_current++;
+            g_LedState[axis] = 1;
+        }
+        else if (stepper[axis].direction == STEPPER_Backward)
+        {
+            GPIO_WriteBit(stepper[axis].dir_port, stepper[axis].dir_pin, Bit_RESET);
+            stepper[axis].position_current--;
+            g_LedState[axis] = 0;
+        }
+
         if (stepper[axis].direction != STEPPER_Stopped)
         {
-            move_finished(axis);
+            GPIO_ToggleBits(stepper[axis].step_port, stepper[axis].step_pin);
         }
-        stepper[axis].direction = STEPPER_Stopped; /// \todo should be part of the move_finished function.
-    }
 
 
-    if (stepper[axis].direction == STEPPER_Forward)
-    {
-        GPIO_WriteBit(stepper[axis].dir_port, stepper[axis].dir_pin, Bit_SET);
-        stepper[axis].position_current++;
-        g_Led2State = 1;
+        TIM_ARRPreloadConfig(stepper[axis].timer, (uint32_t) ( (float)0x1000 / (float) stepper[axis].freq_current) + 3);
     }
-    else if (stepper[axis].direction == STEPPER_Backward)
-    {
-        GPIO_WriteBit(stepper[axis].dir_port, stepper[axis].dir_pin, Bit_RESET);
-        stepper[axis].position_current--;
-        g_Led2State = 0;
-    }
-
-    if (stepper[axis].direction != STEPPER_Stopped)
-    {
-        GPIO_ToggleBits(stepper[axis].step_port, stepper[axis].step_pin);
-    }
-
+    TIM_ClearITPendingBit(stepper[axis].timer, TIM_IT_Update);
 }
 
-void TIM2_IRQHandler(void)
+void TIM1_UP_TIM10_IRQHandler(void)
 {
-
-    if (TIM_GetITStatus(TIM2, TIM_IT_Update) == SET)
-    {
-        Process_Stepper(AXIS_X);
-
-        TIM_ARRPreloadConfig(TIM2, (uint32_t) ( (float)0x1000 / (float) stepper[AXIS_X].freq_current) + 3);
-    }
-    TIM_ClearITPendingBit(TIM2, TIM_IT_Update);
+    Process_Stepper(AXIS_X);
 }
 
-void TIM5_IRQHandler(void)
+void TIM1_TRG_COM_TIM11_IRQHandler(void)
 {
-
-    if (TIM_GetITStatus(TIM5, TIM_IT_Update) == SET)
-    {
-       Process_Stepper(AXIS_Y);
-
-       TIM_ARRPreloadConfig(TIM5, (uint32_t) ( (float)0x1000 / (float) stepper[AXIS_Y].freq_current) + 3);
-    }
-    TIM_ClearITPendingBit(TIM5, TIM_IT_Update);
+    Process_Stepper(AXIS_Y);
 }
 
-/*
-/// \todo to remove, debug only, extracted from temp
-void TIM3_IRQHandler(void)
+void TIM8_UP_TIM13_IRQHandler(void)
 {
-
-    if (TIM_GetITStatus(TIM3, TIM_IT_Update) == SET)
-    {
-        g_Led3State = !g_Led3State;
-    }
-    TIM_ClearITPendingBit(TIM3, TIM_IT_Update);
+    Process_Stepper(AXIS_Z);
 }
-*/
+
+void TIM8_TRG_COM_TIM14_IRQHandler(void)
+{
+    Process_Stepper(AXIS_E);
+}
 
 void move_finished(STEPPER_AXIS axis)
 {
     bool all_stopped = true;
-    /// \todo add the check that all other movements are stopped
+
     for (int i=0; i<AXIS_NUM; i++)
     {
         if ( (i != axis ) // Skip the current axis, to only check if all other have finished
@@ -204,6 +225,58 @@ void move_finished(STEPPER_AXIS axis)
     }
 }
 
+void init_stepper(STEPPER_AXIS axis)
+{
+    if (stepper[axis].timer != 0)
+    {
+        // Timer
+        if (stepper[axis].timerAPB1Periph != 0)
+        {
+            RCC_APB1PeriphClockCmd(stepper[axis].timerAPB1Periph, ENABLE);
+        }
+        if (stepper[axis].timerAPB2Periph != 0)
+        {
+            RCC_APB2PeriphClockCmd(stepper[axis].timerAPB2Periph, ENABLE);
+        }
+
+        TIM_TimeBaseInitTypeDef timeBaseInitStruct;
+        timeBaseInitStruct.TIM_CounterMode = TIM_CounterMode_Up;
+        timeBaseInitStruct.TIM_ClockDivision = TIM_CKD_DIV1;
+        timeBaseInitStruct.TIM_Prescaler = 8;
+        timeBaseInitStruct.TIM_Period = 0x1000;
+        timeBaseInitStruct.TIM_RepetitionCounter = 0; // Only TIM1 & TIM8
+
+        TIM_TimeBaseInit(stepper[axis].timer, &timeBaseInitStruct);
+
+        TIM_ITConfig(stepper[axis].timer, TIM_IT_Update, ENABLE);
+        NVIC_EnableIRQ(stepper[axis].timerIrq);
+
+        TIM_Cmd(stepper[axis].timer, ENABLE);
+
+
+        // Step Output
+        RCC_AHB1PeriphClockCmd(stepper[axis].step_AHB1Periph, ENABLE);
+
+        GPIO_InitTypeDef   GPIO_InitStructureStep;
+        GPIO_InitStructureStep.GPIO_Mode = GPIO_Mode_OUT;
+        GPIO_InitStructureStep.GPIO_PuPd = GPIO_PuPd_NOPULL;
+        GPIO_InitStructureStep.GPIO_Pin = stepper[axis].step_pin;
+
+        GPIO_Init(stepper[axis].step_port, &GPIO_InitStructureStep);
+
+
+        // Dir Output
+
+        RCC_AHB1PeriphClockCmd(stepper[axis].dir_AHB1Periph, ENABLE);
+
+        GPIO_InitTypeDef   GPIO_InitStructureDir;
+        GPIO_InitStructureDir.GPIO_Mode = GPIO_Mode_OUT;
+        GPIO_InitStructureDir.GPIO_PuPd = GPIO_PuPd_NOPULL;
+        GPIO_InitStructureDir.GPIO_Pin = stepper[axis].dir_pin;
+
+        GPIO_Init(stepper[axis].dir_port, &GPIO_InitStructureDir);
+    }
+}
 
 void stepper_init()
 {
@@ -211,75 +284,9 @@ void stepper_init()
     {
         stepper[i].freq_current = 1;
         stepper[i].freq_request = 1;
+
+        init_stepper(i);
     }
-
-    // Timer 2 : stepper A
-    RCC_APB1PeriphClockCmd(RCC_APB1ENR_TIM2EN, ENABLE);
-
-    TIM_TimeBaseInitTypeDef timeBaseInitStruct2;
-    timeBaseInitStruct2.TIM_CounterMode = TIM_CounterMode_Up;
-    timeBaseInitStruct2.TIM_ClockDivision = TIM_CKD_DIV1;
-    timeBaseInitStruct2.TIM_Prescaler = 8;
-    timeBaseInitStruct2.TIM_Period = 0x1000;
-    timeBaseInitStruct2.TIM_RepetitionCounter = 0; // Only TIM1 & TIM8
-
-    TIM_TimeBaseInit(TIM2, &timeBaseInitStruct2);
-
-    TIM_ITConfig(TIM2, TIM_IT_Update, ENABLE);
-    NVIC_EnableIRQ(TIM2_IRQn);
-
-    TIM_Cmd(TIM2, ENABLE);
-
-
-    // Timer 5 : stepper B
-    RCC_APB1PeriphClockCmd(RCC_APB1ENR_TIM5EN, ENABLE);
-
-    TIM_TimeBaseInitTypeDef timeBaseInitStruct5;
-    TIM_TimeBaseStructInit(&timeBaseInitStruct5);
-    timeBaseInitStruct5.TIM_CounterMode = TIM_CounterMode_Up;
-    timeBaseInitStruct5.TIM_ClockDivision = TIM_CKD_DIV1;
-    timeBaseInitStruct5.TIM_Prescaler = 0x8;
-    timeBaseInitStruct5.TIM_Period = 0x1000;
-    timeBaseInitStruct5.TIM_RepetitionCounter = 0; // Only TIM1 & TIM8
-
-    TIM_TimeBaseInit(TIM5, &timeBaseInitStruct5);
-
-    TIM_ITConfig(TIM5, TIM_IT_Update, ENABLE);
-    NVIC_EnableIRQ(TIM5_IRQn);
-
-    TIM_Cmd(TIM5, ENABLE);
-/*
-    /// \todo remove, debug only
-    // Timer 3 : temp measurements
-    RCC_APB1PeriphClockCmd(RCC_APB1ENR_TIM3EN, ENABLE);
-
-    TIM_TimeBaseInitTypeDef timeBaseInitStruct;
-    timeBaseInitStruct.TIM_CounterMode = TIM_CounterMode_Up;
-    timeBaseInitStruct.TIM_ClockDivision = TIM_CKD_DIV1;
-    timeBaseInitStruct.TIM_Prescaler = 0xFFFF;
-    timeBaseInitStruct.TIM_Period = 2563;
-    timeBaseInitStruct.TIM_RepetitionCounter = 0; // Only TIM1 & TIM8
-
-    TIM_TimeBaseInit(TIM3, &timeBaseInitStruct);
-
-    TIM_ITConfig(TIM3, TIM_IT_Update, ENABLE);
-    NVIC_EnableIRQ(TIM3_IRQn);
-
-    TIM_Cmd(TIM3, ENABLE);
-*/
-
-    // Output
-    RCC_AHB1PeriphClockCmd(RCC_AHB1Periph_GPIOE, ENABLE);
-
-    GPIO_InitTypeDef   GPIO_InitStructure;
-    GPIO_InitStructure.GPIO_Mode = GPIO_Mode_OUT;
-    GPIO_InitStructure.GPIO_PuPd = GPIO_PuPd_NOPULL;
-//    GPIO_InitStructure.GPIO_Pin = GPIO_Pin_7 | GPIO_Pin_8; // MotA (step, dir)
-//    GPIO_InitStructure.GPIO_Pin = GPIO_Pin_7 | GPIO_Pin_8 | GPIO_Pin_9 | GPIO_Pin_10; // MotA (step, dir) + MotB (step, dir)
-    GPIO_InitStructure.GPIO_Pin = GPIO_Pin_7 | GPIO_Pin_8 | GPIO_Pin_9 | GPIO_Pin_10 | GPIO_Pin_11 | GPIO_Pin_12 | GPIO_Pin_13 | GPIO_Pin_14; // // MotA (step, dir) + MotB (step, dir) + MotC (step, dir) + MotE (step, dir)
-
-    GPIO_Init(GPIOE, &GPIO_InitStructure);
-
 }
 
 void stepper_move(float delta[AXIS_NUM])

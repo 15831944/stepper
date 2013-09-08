@@ -4,98 +4,63 @@
 
 #include "stepper.h"
 
-bool g_Led2State = false;
-bool g_Led3State = false;
-bool g_Led4State = false;
+bool g_LedState[4] = {false, false, false, false};
 
 void TIM4_IRQHandler(void)
 {
-
     static int dir_up = 1;
-  // flash on update event
-  if (TIM4->SR & TIM_SR_UIF)
-  {
-      //GPIOD->ODR ^= (1 << 13);
-      if (dir_up == 1)
-      {
-          TIM4->CCR1 += 0x01;
-      }
-      else
-      {
-          TIM4->CCR1 -= 0x01;
-      }
 
-      if (TIM4->CCR1 >= 0x0FF)
-      {
-          dir_up = 0;
-      }
-      if (TIM4->CCR1 == 0x000)
-      {
-          dir_up = 1;
-      }
+    // flash on update event
+    if (TIM4->SR & TIM_SR_UIF)
+    {
+        if (dir_up == 1)
+        {
+            TIM4->CCR1 += 0x01;
+        }
+        else
+        {
+            TIM4->CCR1 -= 0x01;
+        }
 
-      //TIM4->CCR2 = TIM4->CCR1;
-      //TIM4->CCR3 = 0x100 - TIM4->CCR1;
-      //TIM4->CCR4 = 0x100 - TIM4->CCR1;
-      //TIM4->CCR4 = TIM4->CCR1;
-
-      if (g_Led2State == true)
-      {
-          TIM4->CCR2 = 0x100;
-      }
-      else
-      {
-          TIM4->CCR2 = 0x0;
-      }
-
-      if (g_Led3State == true)
-      {
-          TIM4->CCR3 = 0x100;
-      }
-      else
-      {
-          TIM4->CCR3 = 0x0;
-      }
-
-      if (g_Led4State == true)
-      {
-          TIM4->CCR4 = 0x100;
-      }
-      else
-      {
-          TIM4->CCR4 = 0x0;
-      }
+        if (TIM4->CCR1 >= 0x0FF)
+        {
+            dir_up = 0;
+        }
+        if (TIM4->CCR1 == 0x000)
+        {
+            dir_up = 1;
+        }
 
 
-//      if (StepperIsForward() == true)
-//      {
-//          TIM4->CCR2 = 0x100;
-//      }
-//      else
-//      {
-//          TIM4->CCR2 = 0x0;
-//      }
+        if (g_LedState[0] == true)
+        {
+            TIM4->CCR2 = 0x100;
+        }
+        else
+        {
+            TIM4->CCR2 = 0x0;
+        }
 
-//      if (GPIO_ReadInputDataBit(GPIOE, GPIO_Pin_7) == Bit_SET)
-//      {
-//          TIM4->CCR3 = 0x100;//0x100 - TIM4->CCR1;
-//      }
-//      else
-//      {
-//          TIM4->CCR3 = 0x0;//TIM4->CCR3 = TIM4->CCR1;
-//      }
+        if (g_LedState[1] == true)
+        {
+            TIM4->CCR3 = 0x100;
+        }
+        else
+        {
+            TIM4->CCR3 = 0x0;
+        }
 
-//      if (GPIO_ReadInputDataBit(GPIOE, GPIO_Pin_9) == Bit_SET)
-//      {
-//          TIM4->CCR4 = 0x100;//0x100 - TIM4->CCR1;
-//      }
-//      else
-//      {
-//          TIM4->CCR4 = 0x0;TIM4->CCR1;
-//      }
-  }
+        if (g_LedState[2] == true)
+        {
+            TIM4->CCR4 = 0x100;
+        }
+        else
+        {
+            TIM4->CCR4 = 0x0;
+        }
+    }
 
-  TIM4->SR = 0x0; // reset the status register
+    TIM4->SR = 0x0; // reset the status register
 }
 
 
@@ -128,8 +93,8 @@ void leds_init()
 
     TIM4->CCER |= TIM_CCER_CC1E | TIM_CCER_CC2E | TIM_CCER_CC3E | TIM_CCER_CC4E; // enable OC1 as Output
     TIM4->CCMR1 |=   TIM_CCMR1_OC1M_1 | TIM_CCMR1_OC1M_2 | TIM_CCMR1_OC1PE
-                   | TIM_CCMR1_OC2M_1 | TIM_CCMR1_OC2M_2 | TIM_CCMR1_OC2PE;
+            | TIM_CCMR1_OC2M_1 | TIM_CCMR1_OC2M_2 | TIM_CCMR1_OC2PE;
     TIM4->CCMR2 |=   TIM_CCMR2_OC3M_1 | TIM_CCMR2_OC3M_2 | TIM_CCMR2_OC3PE
-                   | TIM_CCMR2_OC4M_1 | TIM_CCMR2_OC4M_2 | TIM_CCMR2_OC4PE;
+            | TIM_CCMR2_OC4M_1 | TIM_CCMR2_OC4M_2 | TIM_CCMR2_OC4PE;
 
 }
