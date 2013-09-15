@@ -32,7 +32,8 @@ void TIM4_IRQHandler(void)
         }
 
 
-        if (g_LedState[0] == true)
+//        if (g_LedState[0] == true)
+        if (GPIO_ReadInputDataBit(GPIOE, GPIO_Pin_8) == Bit_SET)
         {
             TIM4->CCR2 = 0x100;
         }
@@ -41,7 +42,8 @@ void TIM4_IRQHandler(void)
             TIM4->CCR2 = 0x0;
         }
 
-        if (g_LedState[1] == true)
+        //if (g_LedState[1] == true)
+        if (GPIO_ReadInputDataBit(GPIOE, GPIO_Pin_10) == Bit_SET)
         {
             TIM4->CCR3 = 0x100;
         }
@@ -50,7 +52,8 @@ void TIM4_IRQHandler(void)
             TIM4->CCR3 = 0x0;
         }
 
-        if (g_LedState[2] == true)
+//        if (g_LedState[2] == true)
+        if (GPIO_ReadInputDataBit(GPIOE, GPIO_Pin_12) == Bit_SET)
         {
             TIM4->CCR4 = 0x100;
         }

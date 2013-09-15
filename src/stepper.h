@@ -23,4 +23,6 @@ void stepper_set_absolute(void);
 void stepper_set_relative(void);
 void stepper_reset(void);
 
+void stepper_set_feedrate(uint32_t feedrate_mmpermin);
+
 #endif // STEPPER_H

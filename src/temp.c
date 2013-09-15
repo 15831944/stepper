@@ -5,9 +5,12 @@
 #include "gcode.h"
 #include "math.h"
 
+
+float extruder_setpoint = 0.0;
+
 float convertAdcTemperature(uint16_t raw);
 
-/*
+
 void TIM3_IRQHandler(void)
 {
 
@@ -18,7 +21,7 @@ void TIM3_IRQHandler(void)
     }
     TIM_ClearITPendingBit(TIM3, TIM_IT_CC1);
 }
-*/
+
 
 void ADC_IRQHandler(void)
 {
@@ -26,14 +29,20 @@ void ADC_IRQHandler(void)
     {
         float temp = convertAdcTemperature(ADC_GetConversionValue(ADC1));
         gcode_setExtruderTempMeasure(temp);
-        //printf("adc=%d\n", ADC_GetConversionValue(ADC1));
+        if (temp < extruder_setpoint)
+        {
+            GPIO_WriteBit(GPIOA, GPIO_Pin_3,  Bit_SET); // Turn heater on if below temp
+        }
+        else
+        {
+            GPIO_WriteBit(GPIOA, GPIO_Pin_3,  Bit_RESET); // Turn heater off if temperature reached
+        }
 
         ADC_ClearITPendingBit(ADC1, ADC_IT_EOC);
     }
 
     if (ADC_GetITStatus(ADC1, ADC_IT_OVR))
     {
-        //gcode_setExtruderTempMeasure(ADC_GetConversionValue(ADC1));
         puts("adc_ovr\n");
 
         ADC_ClearITPendingBit(ADC1, ADC_IT_OVR);
@@ -42,16 +51,32 @@ void ADC_IRQHandler(void)
 
 void temp_init(void)
 {
-/*
-    // Analog Channel 1 on PA1
-    RCC_AHB1PeriphClockCmd(RCC_AHB1Periph_GPIOA, ENABLE);
+
+    // Extruder Analog Channel 1 on PC1 / ADC123_IN11
+    RCC_AHB1PeriphClockCmd(RCC_AHB1Periph_GPIOC, ENABLE);
 
     GPIO_InitTypeDef   GPIO_InitStructure;
 
     GPIO_InitStructure.GPIO_Mode = GPIO_Mode_AN;
     GPIO_InitStructure.GPIO_PuPd = GPIO_PuPd_NOPULL;
     GPIO_InitStructure.GPIO_Pin = GPIO_Pin_1;
-    GPIO_Init(GPIOA, &GPIO_InitStructure);
+    GPIO_Init(GPIOC, &GPIO_InitStructure);
+
+
+
+    // Extruder Heater Output on PA3
+    RCC_AHB1PeriphClockCmd(RCC_AHB1Periph_GPIOA, ENABLE);
+
+    GPIO_InitTypeDef   GPIO_InitStructureHeater;
+    GPIO_InitStructureHeater.GPIO_Mode = GPIO_Mode_OUT;
+    GPIO_InitStructureHeater.GPIO_PuPd = GPIO_PuPd_NOPULL;
+    GPIO_InitStructureHeater.GPIO_Speed = GPIO_Speed_2MHz;
+    GPIO_InitStructureHeater.GPIO_OType = GPIO_OType_PP;
+    GPIO_InitStructureHeater.GPIO_Pin = GPIO_Pin_3;
+
+    GPIO_Init(GPIOA, &GPIO_InitStructureHeater);
+
+    GPIO_WriteBit(GPIOA, GPIO_Pin_3,  Bit_RESET); // Turn heater off at startup
 
 
     // Timer 3 : temp measurements
@@ -109,12 +134,12 @@ void temp_init(void)
     NVIC_SetPriority(ADC_IRQn, 8);
     NVIC_EnableIRQ(ADC_IRQn);
 
-    ADC_RegularChannelConfig(ADC1, ADC_Channel_1, 1, ADC_SampleTime_480Cycles);
+    ADC_RegularChannelConfig(ADC1, ADC_Channel_11, 1, ADC_SampleTime_480Cycles);
 //    ADC_SoftwareStartConv(ADC1);
     ADC_EOCOnEachRegularChannelCmd(ADC1, ENABLE);
 
     ADC_Cmd(ADC1, ENABLE);
-*/
+
 
 
 //    /* Enable ADC1 reset calibaration register */
@@ -129,7 +154,7 @@ void temp_init(void)
 
 void temp_set_extruder(int temp)
 {
-
+    extruder_setpoint = temp;
 }
 
 void temp_set_bed(int temp)
@@ -137,34 +162,10 @@ void temp_set_bed(int temp)
     /// \todo add bed
 }
 
-int temp_get_extruder(void)
-{
-    // Uses a EPCOS B57550G104J﻿PTN resistor (100k @ 25°C)
-    // R/T curve 8304
-    // B25/100 = 4092 K
-
-    /*
-    ADC_RegularChannelConfig(ADC1, ADC_Channel_0, 1, ADC_SampleTime_480Cycles);
-    // Start the conversion
-    ADC_SoftwareStartConv(ADC1);
-    // Wait until conversion completion
-    while(ADC_GetFlagStatus(ADC1, ADC_FLAG_EOC) == RESET);
-    // Reset the flag
-    ADC_ClearFlag(ADC1, ADC_FLAG_EOC);
-    // Get the conversion value
-    return ADC_GetConversionValue(ADC1)/10;
-    */
-    return 0;
-}
-
-int temp_get_bed(void)
-{
-    /// \todo add bed
-}
 
 float convertAdcTemperature(uint16_t raw)
 {
-    const float ref_res = 11000; // Ohms
+    const float ref_res = 1000; // Ohms
     const float ref_voltage = 3.3; // Volts
     float voltage = ref_voltage*raw/4096; // Volts
     float res = voltage*ref_res/(ref_voltage-voltage); // Ohms

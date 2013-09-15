@@ -3,12 +3,16 @@
 #include "stm32f4xx_conf.h"
 
 #include <stdio.h>
+#include <math.h>
 
 // consts
 /// \todo move these constants in the stepper state structure to allow per stepper configuration
 //const float MICROSTEPS = 16;
-#define MICROSTEPS 16
-const float mm2steps = MICROSTEPS * 200.0 / (8.0 * 5.0); // microstep ratio * NbSteps / (Ntooth * PitchBelt)
+#define MICROSTEPS      16
+#define STEP_NUMBER     200.0
+#define TOOTH_NUMBER    8.0
+#define TOOTH_PITCH     5.0
+const float mm2steps = MICROSTEPS * STEP_NUMBER / (TOOTH_NUMBER * TOOTH_PITCH); // microstep ratio * NbSteps / (Ntooth * PitchBelt)
 
 typedef enum
 {
@@ -28,7 +32,7 @@ typedef enum
 
 typedef struct
 {
-    // Config
+    // I/O Config
     uint32_t step_AHB1Periph;
     GPIO_TypeDef* step_port;
     uint16_t step_pin;
@@ -36,7 +40,7 @@ typedef struct
     GPIO_TypeDef* dir_port;
     uint16_t dir_pin;
 
-    //
+    // Timer Config
     TIM_TypeDef* timer;
     uint32_t timerAPB1Periph;
     uint32_t timerAPB2Periph; /// \todo make some function to abstract more easily the timer (should only need to say which timer to use, not provide all fields directly related to it...)
@@ -44,8 +48,8 @@ typedef struct
 
     // move state
     STEPPER_DIR direction;
-    uint32_t freq_request;
-    uint32_t freq_current;
+    uint32_t period_request;
+    uint32_t period_current;
     int32_t position_request;
     int32_t position_current;
 } STEPPER_STATE;
@@ -63,8 +67,8 @@ STEPPER_STATE stepper[4] = {
         .timerAPB2Periph = RCC_APB2ENR_TIM10EN,
         .timerIrq = TIM1_UP_TIM10_IRQn,
         .direction = STEPPER_Stopped,
-        .freq_request = 1,
-        .freq_current = 1,
+        .period_request = 1,
+        .period_current = 1,
         .position_request = 0,
         .position_current = 0
     },
@@ -81,8 +85,8 @@ STEPPER_STATE stepper[4] = {
         .timerAPB2Periph = RCC_APB2ENR_TIM11EN,
         .timerIrq = TIM1_TRG_COM_TIM11_IRQn,
         .direction = STEPPER_Stopped,
-        .freq_request = 1,
-        .freq_current = 1,
+        .period_request = 1,
+        .period_current = 1,
         .position_request = 0,
         .position_current = 0
     },
@@ -99,8 +103,8 @@ STEPPER_STATE stepper[4] = {
         .timerAPB2Periph = 0,
         .timerIrq = TIM8_UP_TIM13_IRQn,
         .direction = STEPPER_Stopped,
-        .freq_request = 1,
-        .freq_current = 1,
+        .period_request = 1,
+        .period_current = 1,
         .position_request = 0,
         .position_current = 0
     },
@@ -117,8 +121,8 @@ STEPPER_STATE stepper[4] = {
         .timerAPB2Periph = 0,
         .timerIrq = TIM8_TRG_COM_TIM14_IRQn,
         .direction = STEPPER_Stopped,
-        .freq_request = 1,
-        .freq_current = 1,
+        .period_request = 1,
+        .period_current = 1,
         .position_request = 0,
         .position_current = 0
     }
@@ -180,7 +184,9 @@ inline void Process_Stepper(STEPPER_AXIS axis)
         }
 
 
-        TIM_ARRPreloadConfig(stepper[axis].timer, (uint32_t) ( (float)0x1000 / (float) stepper[axis].freq_current) + 3);
+        TIM_SetAutoreload(stepper[axis].timer, stepper[axis].period_current);
+//        TIM_ARRPreloadConfig(stepper[axis].timer, (uint32_t) ( (float)0x1000 / (float) stepper[axis].period_current) + 3);
+
     }
     TIM_ClearITPendingBit(stepper[axis].timer, TIM_IT_Update);
 }
@@ -221,7 +227,8 @@ void move_finished(STEPPER_AXIS axis)
 
     if (all_stopped)
     {
-        puts("ok\n"); // Print only once when the last move finishes
+        //puts("ok\n"); // Print only once when the last move finishes
+        printf("ok x:%4d y:%4d z:%4d e:%4d period_x:%d period_y:%d pre_x=%d pre_y:%d\n", stepper[AXIS_X].position_current, stepper[AXIS_Y].position_current, stepper[AXIS_Z].position_current, stepper[AXIS_E].position_current, stepper[AXIS_X].period_current, stepper[AXIS_Y].period_current, TIM_GetPrescaler(stepper[AXIS_X].timer), TIM_GetPrescaler(stepper[AXIS_Y].timer));
     }
 }
 
@@ -242,11 +249,12 @@ void init_stepper(STEPPER_AXIS axis)
         TIM_TimeBaseInitTypeDef timeBaseInitStruct;
         timeBaseInitStruct.TIM_CounterMode = TIM_CounterMode_Up;
         timeBaseInitStruct.TIM_ClockDivision = TIM_CKD_DIV1;
-        timeBaseInitStruct.TIM_Prescaler = 8;
+        timeBaseInitStruct.TIM_Prescaler = 52500; // Default to 10mm/s
         timeBaseInitStruct.TIM_Period = 0x1000;
         timeBaseInitStruct.TIM_RepetitionCounter = 0; // Only TIM1 & TIM8
 
         TIM_TimeBaseInit(stepper[axis].timer, &timeBaseInitStruct);
+        TIM_ARRPreloadConfig(stepper[axis].timer, ENABLE);
 
         TIM_ITConfig(stepper[axis].timer, TIM_IT_Update, ENABLE);
         NVIC_EnableIRQ(stepper[axis].timerIrq);
@@ -282,8 +290,8 @@ void stepper_init()
 {
     for (int i=0; i<AXIS_NUM; i++)
     {
-        stepper[i].freq_current = 1;
-        stepper[i].freq_request = 1;
+        stepper[i].period_current = 1;
+        stepper[i].period_request = 1;
 
         init_stepper(i);
     }
@@ -291,18 +299,37 @@ void stepper_init()
 
 void stepper_move(float delta[AXIS_NUM])
 {
+
+    // Compute norm of displacement on (X, Y, Z), to then compute speed along each axis
+    float normDelta = sqrtf(powf(delta[AXIS_X], 2.0) + powf(delta[AXIS_Y], 2.0) + powf(delta[AXIS_Z], 2.0));
+
     for (int i=0; i<AXIS_NUM; i++)
     {
-        if (mode == MOVE_Absolute)
+        if (delta[i] != 0)
         {
-            stepper[i].position_request = 2 * delta[i] * mm2steps; // x2 because of using toggle in interrupts (2 interrupts for one pulse)
-        }
-        else
-        {
-            stepper[i].position_request += 2 * delta[i] * mm2steps; // x2 because of using toggle in interrupts (2 interrupts for one pulse)
-        }
+            if (mode == MOVE_Absolute)
+            {
+                stepper[i].position_request = 2 * delta[i] * mm2steps; // x2 because of using toggle in interrupts (2 interrupts for one pulse)
+            }
+            else
+            {
+                stepper[i].position_request += 2 * delta[i] * mm2steps; // x2 because of using toggle in interrupts (2 interrupts for one pulse)
+            }
 
-        stepper[i].direction = STEPPER_Waiting;
+            float period = 0.0;
+            if (i != AXIS_E)
+            {
+                period = fabs(normDelta/delta[i]);
+            }
+            else
+            {
+                period = 1;
+            }
+            stepper[i].period_current = (uint32_t) period;
+            TIM_SetAutoreload(stepper[i].timer, stepper[i].period_current);
+//            TIM_ARRPreloadConfig(stepper[i].timer, (uint32_t) ( (float)0x1000 / (float) stepper[i].period_current) + 3);
+            stepper[i].direction = STEPPER_Waiting;
+        }
     }
 }
 
@@ -334,3 +361,24 @@ void stepper_reset()
         stepper[i].position_request = 0;
     }
 }
+
+
+/// \todo allow for different feedrate on extruder and z axis
+void stepper_set_feedrate(uint32_t feedrate_mmpermin)
+{
+    // Configure the timer prescalers so the smaller counter (1) goes to the max of the feedrate.
+    // Leaves 16 bits of precision for subspeed (1/65535 at min speed)
+    for (int i =0; i<AXIS_NUM; i++)
+    {
+        uint16_t prescaler = 0;
+        uint32_t Fclk = 168000000/64; /// At CLK_DIV_1 => APB Timer clock = 168MHz main clock (PLL) /1 (HCLK) /4 (APBx) .... what else ? \see SetSysClock for more details
+        prescaler = Fclk / (feedrate_mmpermin * mm2steps / 60);
+
+//        prescaler = prescaler/64; /// \todo Correct this hack when found which clock is used for these Timers... !!
+
+        // Prescaler change can be immediate or done at the next update event
+        // Do it immedialty, as the update event can be a long time from now depending on the last config
+        TIM_PrescalerConfig(stepper[i].timer, prescaler, TIM_PSCReloadMode_Immediate);
+    }
+}
+

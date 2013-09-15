@@ -25,7 +25,7 @@ int main(void)
 //    inputs_init();
     usb_init();
     gcode_init();
-//    temp_init();
+    temp_init();
 
     while (1)
     {

@@ -33,8 +33,9 @@ typedef struct
     // Peripherals state
     bool spindleOn; /// \todo to add : coolant, vacuum
     float extruderTempOrder;
+    float extruderTempMeas;
     float bedTempOrder;
-
+    float bedTempMeas;
     /// \todo to be complete with all other commands
 } gcode_state;
 
@@ -80,9 +81,10 @@ static gcode_state state =
     .units = millimiters,
     .extruderMode = absolute,
     .spindleOn = false,
-    .extruderTempOrder = 100,
-    .bedTempOrder = 50,
-
+    .extruderTempOrder = 0,
+    .extruderTempMeas = 0,
+    .bedTempOrder = 0,
+    .bedTempMeas = 0,
 };
 
 // Private Prototypes
@@ -292,16 +294,18 @@ void processGCode(const cmd_param param)
             puts("ok\n");
             break;
         case 1: // G1 = Controlled move
+
+            if (param.f != 0.0)
+            {
+                stepper_set_feedrate(param.f);
+            }
+
             if ( (param.x != 0.0) || (param.y != 0.0) || (param.z != 0.0) || (param.e != 0.0) )
             {
                 /// \todo add support for feedrate (F code)
                 float delta[AXIS_NUM] = {param.x, param.y, param.z, param.e};
                 stepper_move(delta);
             }
-//            if ( param.x != 0.0 )
-//            {
-//                stepper_move(param.x, param.y);
-//            }
             else
             {
                 puts("ok\n");
@@ -399,11 +403,11 @@ void processMCode(const cmd_param param)
         case 104: // M104 = Set Extruder Temperature
             //sscanf(data, "M104 S%d", &state.extruderTempOrder);
             state.extruderTempOrder = param.s;
+            temp_set_extruder(state.extruderTempOrder);
             puts("ok\n");
             break;
         case 105: // M105 = Get Extruder Temperature
-//            printf("ok T:%d B:%d\n", temp_get_extruder(), state.bedTempOrder);
-            printf("ok T:%.2f B:%.2f\n", state.extruderTempOrder, state.bedTempOrder);
+            printf("ok T:%.2f B:%.2f\n", state.extruderTempMeas, state.bedTempMeas);
             break;
         case 106: // M106 = Fan On
         case 107: // M107 = Fan Off
@@ -492,6 +496,5 @@ void processTCode(const cmd_param param)
 
 void gcode_setExtruderTempMeasure(float temp)
 {
-    /// \todo replace order by measure
-    state.extruderTempOrder = temp;
+    state.extruderTempMeas = temp;
 }
