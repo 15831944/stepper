@@ -12,7 +12,11 @@
 #define STEP_NUMBER     200.0
 #define TOOTH_NUMBER    8.0
 #define TOOTH_PITCH     5.0
-const float mm2steps = MICROSTEPS * STEP_NUMBER / (TOOTH_NUMBER * TOOTH_PITCH); // microstep ratio * NbSteps / (Ntooth * PitchBelt)
+#define mm2stepsPulley (MICROSTEPS * STEP_NUMBER / (TOOTH_NUMBER * TOOTH_PITCH))
+
+#define M_PI		3.14159265358979323846 /// \todo find why the include math.h don't define M_PI ?
+#define EXTRUDER_AXIS_DIAMETER 8.0
+#define mm2stepsExtruder (MICROSTEPS * STEP_NUMBER / (M_PI * EXTRUDER_AXIS_DIAMETER))
 
 typedef enum
 {
@@ -52,9 +56,13 @@ typedef struct
     uint32_t period_current;
     int32_t position_request;
     int32_t position_current;
+    MOVE_MODE mode;
+    float mm2steps;
+
 } STEPPER_STATE;
 
 STEPPER_STATE stepper[4] = {
+    // X
     {
         .step_AHB1Periph = RCC_AHB1Periph_GPIOE,
         .step_port = GPIOE,
@@ -70,9 +78,12 @@ STEPPER_STATE stepper[4] = {
         .period_request = 1,
         .period_current = 1,
         .position_request = 0,
-        .position_current = 0
+        .position_current = 0,
+        .mode = MOVE_Absolute,
+        .mm2steps = mm2stepsPulley
     },
 
+    // Y
     {
         .step_AHB1Periph = RCC_AHB1Periph_GPIOE,
         .step_port = GPIOE,
@@ -88,9 +99,12 @@ STEPPER_STATE stepper[4] = {
         .period_request = 1,
         .period_current = 1,
         .position_request = 0,
-        .position_current = 0
+        .position_current = 0,
+        .mode = MOVE_Absolute,
+        .mm2steps = mm2stepsPulley
     },
 
+    // Z
     {
         .step_AHB1Periph = RCC_AHB1Periph_GPIOE,
         .step_port = GPIOE,
@@ -106,9 +120,12 @@ STEPPER_STATE stepper[4] = {
         .period_request = 1,
         .period_current = 1,
         .position_request = 0,
-        .position_current = 0
+        .position_current = 0,
+        .mode = MOVE_Absolute,
+        .mm2steps = mm2stepsPulley
     },
 
+    // E
     {
         .step_AHB1Periph = RCC_AHB1Periph_GPIOE,
         .step_port = GPIOE,
@@ -124,13 +141,11 @@ STEPPER_STATE stepper[4] = {
         .period_request = 1,
         .period_current = 1,
         .position_request = 0,
-        .position_current = 0
+        .position_current = 0,
+        .mode = MOVE_Absolute,
+        .mm2steps = mm2stepsExtruder
     }
 };
-
-/// \todo move "move mode" in the stepper state structure to allow per stepper configuration
-MOVE_MODE mode = MOVE_Relative;
-
 
 void move_finished(STEPPER_AXIS axis);
 void Process_Stepper(STEPPER_AXIS axis); /// Function to call on interrupt to process the new step and the associated state machine
@@ -288,12 +303,12 @@ void init_stepper(STEPPER_AXIS axis)
 
 void stepper_init()
 {
-    for (int i=0; i<AXIS_NUM; i++)
+    for (int axis=0; axis<AXIS_NUM; axis++)
     {
-        stepper[i].period_current = 1;
-        stepper[i].period_request = 1;
+        stepper[axis].period_current = 1;
+        stepper[axis].period_request = 1;
 
-        init_stepper(i);
+        init_stepper(axis);
     }
 }
 
@@ -303,32 +318,31 @@ void stepper_move(float delta[AXIS_NUM])
     // Compute norm of displacement on (X, Y, Z), to then compute speed along each axis
     float normDelta = sqrtf(powf(delta[AXIS_X], 2.0) + powf(delta[AXIS_Y], 2.0) + powf(delta[AXIS_Z], 2.0));
 
-    for (int i=0; i<AXIS_NUM; i++)
+    for (int axis=0; axis<AXIS_NUM; axis++)
     {
-        if (delta[i] != 0)
+        if (delta[axis] != 0)
         {
-            if (mode == MOVE_Absolute)
+            if (stepper[axis].mode == MOVE_Absolute)
             {
-                stepper[i].position_request = 2 * delta[i] * mm2steps; // x2 because of using toggle in interrupts (2 interrupts for one pulse)
+                stepper[axis].position_request = 2 * delta[axis] * stepper[axis].mm2steps; // x2 because of using toggle in interrupts (2 interrupts for one pulse)
             }
             else
             {
-                stepper[i].position_request += 2 * delta[i] * mm2steps; // x2 because of using toggle in interrupts (2 interrupts for one pulse)
+                stepper[axis].position_request += 2 * delta[axis] * stepper[axis].mm2steps; // x2 because of using toggle in interrupts (2 interrupts for one pulse)
             }
 
             float period = 0.0;
-            if (i != AXIS_E)
+            if (axis != AXIS_E)
             {
-                period = fabs(normDelta/delta[i]);
+                period = fabs(normDelta/delta[axis]);
             }
             else
             {
                 period = 1;
             }
-            stepper[i].period_current = (uint32_t) period;
-            TIM_SetAutoreload(stepper[i].timer, stepper[i].period_current);
-//            TIM_ARRPreloadConfig(stepper[i].timer, (uint32_t) ( (float)0x1000 / (float) stepper[i].period_current) + 3);
-            stepper[i].direction = STEPPER_Waiting;
+            stepper[axis].period_current = (uint32_t) period;
+            TIM_SetAutoreload(stepper[axis].timer, stepper[axis].period_current);
+            stepper[axis].direction = STEPPER_Waiting;
         }
     }
 }
@@ -342,43 +356,46 @@ void stepper_stop()
     }
 }
 
-void stepper_set_absolute()
+void stepper_set_absolute(STEPPER_AXIS axis)
 {
-    mode = MOVE_Absolute;
+    stepper[axis].mode = MOVE_Absolute;
 }
 
-void stepper_set_relative()
+void stepper_set_relative(STEPPER_AXIS axis)
 {
-    mode = MOVE_Relative;
+    stepper[axis].mode = MOVE_Relative;
 }
 
 void stepper_reset()
 {
-    for (int i=0; i<AXIS_NUM; i++)
+    for (int axis=0; axis<AXIS_NUM; axis++)
     {
-        stepper[i].direction = STEPPER_Stopped;
-        stepper[i].position_current = 0;
-        stepper[i].position_request = 0;
+        stepper[axis].direction = STEPPER_Stopped;
+        stepper[axis].position_current = 0;
+        stepper[axis].position_request = 0;
     }
 }
 
+void stepper_set_position(STEPPER_AXIS axis, float position)
+{
+    stepper[axis].position_current = position;
+}
 
 /// \todo allow for different feedrate on extruder and z axis
-void stepper_set_feedrate(uint32_t feedrate_mmpermin)
+void stepper_set_feedrate(STEPPER_AXIS axis, uint32_t feedrate_mmpermin)
 {
     // Configure the timer prescalers so the smaller counter (1) goes to the max of the feedrate.
     // Leaves 16 bits of precision for subspeed (1/65535 at min speed)
-    for (int i =0; i<AXIS_NUM; i++)
-    {
-        uint16_t prescaler = 0;
-        uint32_t Fclk = 168000000/64; /// At CLK_DIV_1 => APB Timer clock = 168MHz main clock (PLL) /1 (HCLK) /4 (APBx) .... what else ? \see SetSysClock for more details
-        prescaler = Fclk / (feedrate_mmpermin * mm2steps / 60);
+
+    uint16_t prescaler = 0;
+    uint32_t Fclk = 168000000/64; /// At CLK_DIV_1 => APB Timer clock = 168MHz main clock (PLL) /1 (HCLK) /4 (APBx) .... what else ? \see SetSysClock for more details
+    prescaler = Fclk / (feedrate_mmpermin * stepper[axis].mm2steps / 60);
 
 //        prescaler = prescaler/64; /// \todo Correct this hack when found which clock is used for these Timers... !!
 
-        // Prescaler change can be immediate or done at the next update event
-        // Do it immedialty, as the update event can be a long time from now depending on the last config
-        TIM_PrescalerConfig(stepper[i].timer, prescaler, TIM_PSCReloadMode_Immediate);
-    }
+    // Prescaler change can be immediate or done at the next update event
+    // Do it immedialty, as the update event can be a long time from now depending on the last config
+    TIM_PrescalerConfig(stepper[axis].timer, prescaler, TIM_PSCReloadMode_Immediate);
+
 }
 

@@ -49,27 +49,41 @@ typedef struct
 {
     // pos
     float x;
+    bool x_set;
     float y;
+    bool y_set;
     float z;
+    bool z_set;
     float e;
+    bool e_set;
 
     // param
     float p; //
+    bool p_set;
     float f; // feedrate, ex mm/s
+    bool f_set;
     float s; // Speed, ex RPM
+    bool s_set;
 
     // arc
     float i;
+    bool i_set;
     float j;
+    bool j_set;
     float k;
+    bool k_set;
 
     // commands
     float g;
+    bool g_set;
     float m;
+    bool m_set;
     float t;
+    bool t_set;
 
     // Line number
     float n;
+    bool n_set;
     float checksum;
 } cmd_param;
 
@@ -148,28 +162,36 @@ void parseCode(const char* const data)
                 {
                     case 'E': // E = Precision feedrate for threading on lathes
                         param.e = value;
+                        param.e_set = true;
                         break;
                     case 'F': // F = Defines feed rate
                         param.f = value;
+                        param.f_set = true;
                         break;
                     case 'G': //
                         param.g = value;
+                        param.g_set = true;
                         break;
 
                     case 'I': // I = Defines arc center in X axis for G02 or G03 arc commands.
                         param.i = value;
+                        param.i_set = true;
                         break;
                     case 'J': // J = Defines arc center in Y axis for G02 or G03 arc commands.
                         param.j = value;
+                        param.j_set = true;
                         break;
                     case 'K': // K = Defines arc center in Z axis for G02 or G03 arc commands.
                         param.k = value;
+                        param.k_set = true;
                         break;
                     case 'M': //
                         param.m = value;
+                        param.m_set = true;
                         break;
                     case 'N': //
                         param.n = value;
+                        param.n_set = true;
                         break;
                     case '*': //
                         param.checksum = value;
@@ -177,23 +199,29 @@ void parseCode(const char* const data)
 
                     case 'P': // P = Serves as parameter address for various G and M codes
                         param.p = value;
+                        param.p_set = true;
                         break;
 
                     case 'S': // S = Defines speed, either spindle speed or surface speed depending on mode
                         param.s = value;
+                        param.s_set = true;
                         break;
                     case 'T': //
                         param.t = value;
+                        param.t_set = true;
                         break;
 
                     case 'X': // X = Absolute or incremental position of X axis.
                         param.x = value;
+                        param.x_set = true;
                         break;
                     case 'Y': // Y = Absolute or incremental position of Y axis
                         param.y = value;
+                        param.y_set = true;
                         break;
                     case 'Z': // Z = Absolute or incremental position of Z axis
                         param.z = value;
+                        param.z_set = true;
                         break;
                     default:
                         //
@@ -228,62 +256,19 @@ void parseCode(const char* const data)
 //    printf("z=%f\n", param.z);
 
 
-    if (param.g != 0)
+    if (param.g_set)
     {
         processGCode(param);
     }
-    else if (param.m != 0)
+    else if (param.m_set)
     {
         processMCode(param);
     }
-    else if (param.t != 0)
+    else if (param.t_set)
     {
         processTCode(param);
     }
-/*
-    sscanf(data, "%c%d", &letter, &num);
 
-    switch (letter)
-    {
-        case 'A': // A = Absolute or incremental position of A axis (rotational axis around X axis)
-        case 'B': // B = Absolute or incremental position of B axis (rotational axis around Y axis)
-        case 'C': // C = Absolute or incremental position of C axis (rotational axis around Z axis)
-        case 'D': // D = Defines diameter or radial offset used for cutter compensation. D is used for depth of cut on lathes.
-        case 'E': // E = Precision feedrate for threading on lathes
-        case 'F': // F = Defines feed rate
-            break;
-        case 'G': // G = Address for preparatory commands
-            processGCode(param.g, param);
-            break;
-        case 'H': // H = Defines tool length offset;
-        case 'I': // I = Defines arc center in X axis for G02 or G03 arc commands.
-        case 'J': // J = Defines arc center in Y axis for G02 or G03 arc commands.
-        case 'K': // K = Defines arc center in Z axis for G02 or G03 arc commands.
-        case 'L': // L = Fixed cycle loop count;
-            break;
-        case 'M': // M = Miscellaneous function
-            processMCode(num, data);
-            break;
-        case 'N': // N = Line (block) number in program;
-        case 'O': // O = Program name
-        case 'P': // P = Serves as parameter address for various G and M codes
-        case 'Q': // Q = Peck increment in canned cycles
-        case 'R': // R = Defines size of arc radius, or defines retract height in milling canned cycles
-        case 'S': // S = Defines speed, either spindle speed or surface speed depending on mode
-            break;
-        case 'T': // T = Tool selection
-            processTCode(num);
-            break;
-        case 'U': // U = Incremental axis corresponding to X axis (typically only lathe group A controls)
-        case 'V': // V = Incremental axis corresponding to Y axis
-        case 'W': // W = Incremental axis corresponding to Z axis (typically only lathe group A controls)
-        case 'X': // X = Absolute or incremental position of X axis.
-        case 'Y': // Y = Absolute or incremental position of Y axis
-        case 'Z': // Z = Absolute or incremental position of Z axis
-        default:
-            break;
-    }
-    */
 }
 
 void processGCode(const cmd_param param)
@@ -291,18 +276,32 @@ void processGCode(const cmd_param param)
     switch ((int)param.g)
     {
         case 0: // G0 = Rapid move
-            puts("ok\n");
-            break;
+            // Handle G0 as G1 (so no break here)
         case 1: // G1 = Controlled move
 
-            if (param.f != 0.0)
+            if (param.f_set && (param.f != 0.0) )
             {
-                stepper_set_feedrate(param.f);
+                if ( param.x_set )
+                {
+                    stepper_set_feedrate(AXIS_X, param.f);
+                }
+                if ( param.y_set )
+                {
+                    stepper_set_feedrate(AXIS_Y, param.f);
+                }
+                if ( param.z_set )
+                {
+                    stepper_set_feedrate(AXIS_Z, param.f);
+                }
+                if ( param.e_set )
+                {
+                    /// \todo Probably not the good way to handle extruder feedrate. To be investigated and updated.
+                    stepper_set_feedrate(AXIS_E, param.f);
+                }
             }
 
-            if ( (param.x != 0.0) || (param.y != 0.0) || (param.z != 0.0) || (param.e != 0.0) )
+            if ( param.x_set || param.y_set || param.z_set || param.e_set )
             {
-                /// \todo add support for feedrate (F code)
                 float delta[AXIS_NUM] = {param.x, param.y, param.z, param.e};
                 stepper_move(delta);
             }
@@ -318,9 +317,11 @@ void processGCode(const cmd_param param)
             puts("ok\n");
             break;
         case 20: // G20 = Set Units to Inches
-            puts("ok\n");
+            /// \todo to handle
+            puts("!!\n"); // Send Command Fail to block the system
             break;
         case 21: // G21 = Set Units to Millimeters
+            /// \todo to handle
             puts("ok\n");
             break;
         case 28: // G28 = Move to Origin
@@ -334,14 +335,35 @@ void processGCode(const cmd_param param)
             puts("ok\n");
             break;
         case 90: // G90 = Set to Absolute Positioning
-            stepper_set_absolute();
+            stepper_set_absolute(AXIS_X);
+            stepper_set_absolute(AXIS_Y);
+            stepper_set_absolute(AXIS_Z);
             puts("ok\n");
             break;
         case 91: // G91 = Set to Relative Positioning
-            stepper_set_relative();
+            stepper_set_relative(AXIS_X);
+            stepper_set_relative(AXIS_Y);
+            stepper_set_relative(AXIS_Z);
             puts("ok\n");
             break;
         case 92: // G92 = Set Position
+            if (param.x != 0.0)
+            {
+                stepper_set_position(AXIS_X, param.x);
+            }
+            if (param.y != 0.0)
+            {
+                stepper_set_position(AXIS_Y, param.y);
+            }
+            if (param.z != 0.0)
+            {
+                stepper_set_position(AXIS_Z, param.z);
+            }
+            if (param.e != 0.0)
+            {
+                stepper_set_position(AXIS_E, param.e);
+            }
+
             puts("ok\n");
             break;
         default:
@@ -391,8 +413,16 @@ void processMCode(const cmd_param param)
         case 43: // M43 = Stand by on material exhausted
         case 80: // M80 = ATX Power On
         case 81: // M81 = ATX Power Off
+            puts("ok\n");
+            break;
         case 82: // M82 = set extruder to absolute mode
+            stepper_set_absolute(AXIS_E);
+            puts("ok\n");
+            break;
         case 83: // M83 = set extruder to relative mode
+            stepper_set_relative(AXIS_E);
+            puts("ok\n");
+            break;
         case 84: // M84 = Stop idle hold
         case 92: // M92 = Set axis_steps_per_unit
         case 98: // M98 = Get axis_hysteresis_mm
@@ -400,8 +430,9 @@ void processMCode(const cmd_param param)
         case 101: // M101 = Turn extruder 1 on Forward / Undo Extruder Retraction
         case 102: // M102 = Turn extruder 1 on Reverse
         case 103: // M103 = Turn all extruders off / Extruder Retraction
+            puts("ok\n");
+            break;
         case 104: // M104 = Set Extruder Temperature
-            //sscanf(data, "M104 S%d", &state.extruderTempOrder);
             state.extruderTempOrder = param.s;
             temp_set_extruder(state.extruderTempOrder);
             puts("ok\n");
@@ -412,7 +443,14 @@ void processMCode(const cmd_param param)
         case 106: // M106 = Fan On
         case 107: // M107 = Fan Off
         case 108: // M108 = Set Extruder Speed
+            puts("ok\n");
+            break;
         case 109: // M109 = Set Extruder Temperature and Wait
+            state.extruderTempOrder = param.s;
+            temp_set_extruder(state.extruderTempOrder);
+            /// \todo add wait for temperature reached
+            puts("ok\n");
+            break;
         case 110: // M110 = Set Current Line Number
         case 111: // M111 = Set Debug Level
         case 112: // M112 = Emergency Stop

@@ -19,10 +19,11 @@ void stepper_init(void);
 void stepper_move(float delta[AXIS_NUM]);
 void stepper_stop();
 
-void stepper_set_absolute(void);
-void stepper_set_relative(void);
+void stepper_set_absolute(STEPPER_AXIS axis);
+void stepper_set_relative(STEPPER_AXIS axis);
 void stepper_reset(void);
 
-void stepper_set_feedrate(uint32_t feedrate_mmpermin);
+void stepper_set_feedrate(STEPPER_AXIS axis, uint32_t feedrate_mmpermin);
+void stepper_set_position(STEPPER_AXIS axis, float position);
 
 #endif // STEPPER_H
