@@ -16,7 +16,7 @@ typedef enum
 
 void stepper_init(void);
 
-void stepper_move(float delta[AXIS_NUM]);
+void stepper_move(float pos[AXIS_NUM], bool set[]);
 void stepper_stop();
 
 void stepper_set_absolute(STEPPER_AXIS axis);

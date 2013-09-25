@@ -281,29 +281,17 @@ void processGCode(const cmd_param param)
 
             if (param.f_set && (param.f != 0.0) )
             {
-                if ( param.x_set )
-                {
-                    stepper_set_feedrate(AXIS_X, param.f);
-                }
-                if ( param.y_set )
-                {
-                    stepper_set_feedrate(AXIS_Y, param.f);
-                }
-                if ( param.z_set )
-                {
-                    stepper_set_feedrate(AXIS_Z, param.f);
-                }
-                if ( param.e_set )
-                {
-                    /// \todo Probably not the good way to handle extruder feedrate. To be investigated and updated.
-                    stepper_set_feedrate(AXIS_E, param.f);
-                }
+                stepper_set_feedrate(AXIS_X, param.f);
+                stepper_set_feedrate(AXIS_Y, param.f);
+                stepper_set_feedrate(AXIS_Z, param.f);
+                stepper_set_feedrate(AXIS_E, param.f);
             }
 
             if ( param.x_set || param.y_set || param.z_set || param.e_set )
             {
-                float delta[AXIS_NUM] = {param.x, param.y, param.z, param.e};
-                stepper_move(delta);
+                float pos[AXIS_NUM] = {param.x, param.y, param.z, param.e};
+                bool set[AXIS_NUM] = {param.x_set, param.y_set, param.z_set, param.e_set};
+                stepper_move(pos, set);
             }
             else
             {
@@ -347,19 +335,19 @@ void processGCode(const cmd_param param)
             puts("ok\n");
             break;
         case 92: // G92 = Set Position
-            if (param.x != 0.0)
+            if (param.x_set)
             {
                 stepper_set_position(AXIS_X, param.x);
             }
-            if (param.y != 0.0)
+            if (param.y_set)
             {
                 stepper_set_position(AXIS_Y, param.y);
             }
-            if (param.z != 0.0)
+            if (param.z_set)
             {
                 stepper_set_position(AXIS_Z, param.z);
             }
-            if (param.e != 0.0)
+            if (param.e_set)
             {
                 stepper_set_position(AXIS_E, param.e);
             }

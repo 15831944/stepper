@@ -58,7 +58,7 @@ typedef struct
     int32_t position_current;
     MOVE_MODE mode;
     float mm2steps;
-
+    bool is_inverted; // To invert the movement orders to the stepper referential
 } STEPPER_STATE;
 
 STEPPER_STATE stepper[4] = {
@@ -80,7 +80,8 @@ STEPPER_STATE stepper[4] = {
         .position_request = 0,
         .position_current = 0,
         .mode = MOVE_Absolute,
-        .mm2steps = mm2stepsPulley
+        .mm2steps = mm2stepsPulley,
+        .is_inverted = false
     },
 
     // Y
@@ -101,7 +102,8 @@ STEPPER_STATE stepper[4] = {
         .position_request = 0,
         .position_current = 0,
         .mode = MOVE_Absolute,
-        .mm2steps = mm2stepsPulley
+        .mm2steps = mm2stepsPulley,
+        .is_inverted = true
     },
 
     // Z
@@ -122,7 +124,8 @@ STEPPER_STATE stepper[4] = {
         .position_request = 0,
         .position_current = 0,
         .mode = MOVE_Absolute,
-        .mm2steps = mm2stepsPulley
+        .mm2steps = mm2stepsPulley,
+        .is_inverted = true
     },
 
     // E
@@ -143,7 +146,8 @@ STEPPER_STATE stepper[4] = {
         .position_request = 0,
         .position_current = 0,
         .mode = MOVE_Absolute,
-        .mm2steps = mm2stepsExtruder
+        .mm2steps = mm2stepsExtruder,
+        .is_inverted = false
     }
 };
 
@@ -243,7 +247,10 @@ void move_finished(STEPPER_AXIS axis)
     if (all_stopped)
     {
         //puts("ok\n"); // Print only once when the last move finishes
-        printf("ok x:%4d y:%4d z:%4d e:%4d period_x:%d period_y:%d pre_x=%d pre_y:%d\n", stepper[AXIS_X].position_current, stepper[AXIS_Y].position_current, stepper[AXIS_Z].position_current, stepper[AXIS_E].position_current, stepper[AXIS_X].period_current, stepper[AXIS_Y].period_current, TIM_GetPrescaler(stepper[AXIS_X].timer), TIM_GetPrescaler(stepper[AXIS_Y].timer));
+        printf("ok x:%4d y:%4d z:%4d e:%4d period_x:%4u y:%4u z:%4u e:%4u pre_x=%5u y:%5u z:%5u e:%5u\n",
+               (int)stepper[AXIS_X].position_current, (int)stepper[AXIS_Y].position_current, (int)stepper[AXIS_Z].position_current, (int)stepper[AXIS_E].position_current,
+               (unsigned int)stepper[AXIS_X].period_current, (unsigned int)stepper[AXIS_Y].period_current, (unsigned int)stepper[AXIS_Z].period_current, (unsigned int)stepper[AXIS_E].period_current,
+               (unsigned int) TIM_GetPrescaler(stepper[AXIS_X].timer), (unsigned int) TIM_GetPrescaler(stepper[AXIS_Y].timer), (unsigned int) TIM_GetPrescaler(stepper[AXIS_Z].timer), (unsigned int) TIM_GetPrescaler(stepper[AXIS_E].timer));
     }
 }
 
@@ -312,37 +319,67 @@ void stepper_init()
     }
 }
 
-void stepper_move(float delta[AXIS_NUM])
+void stepper_move(float pos[AXIS_NUM], bool set[AXIS_NUM])
 {
-
-    // Compute norm of displacement on (X, Y, Z), to then compute speed along each axis
-    float normDelta = sqrtf(powf(delta[AXIS_X], 2.0) + powf(delta[AXIS_Y], 2.0) + powf(delta[AXIS_Z], 2.0));
+    float delta[AXIS_NUM];
 
     for (int axis=0; axis<AXIS_NUM; axis++)
     {
-        if (delta[axis] != 0)
+        if (set[axis]) // Only moves this stepper if the position along this axis as been set in the G-Code command
         {
+            if (stepper[axis].is_inverted)
+            {
+                pos[axis] = -pos[axis];
+            }
+
             if (stepper[axis].mode == MOVE_Absolute)
             {
-                stepper[axis].position_request = 2 * delta[axis] * stepper[axis].mm2steps; // x2 because of using toggle in interrupts (2 interrupts for one pulse)
+                stepper[axis].position_request = 2 * pos[axis] * stepper[axis].mm2steps; // x2 because of using toggle in interrupts (2 interrupts for one pulse)
             }
             else
             {
-                stepper[axis].position_request += 2 * delta[axis] * stepper[axis].mm2steps; // x2 because of using toggle in interrupts (2 interrupts for one pulse)
+                stepper[axis].position_request += 2 * pos[axis] * stepper[axis].mm2steps; // x2 because of using toggle in interrupts (2 interrupts for one pulse)
             }
 
-            float period = 0.0;
-            if (axis != AXIS_E)
+            delta[axis] = stepper[axis].position_request - stepper[axis].position_current;
+        }
+        else
+        {
+            delta[axis] = 0;
+        }
+    }
+
+    for (int axis=0; axis<AXIS_NUM; axis++)
+    {
+        float period = 0.0;
+
+        // Compute norm of displacement on (X, Y, Z), to then compute speed along each axis
+        float normDelta = sqrtf(powf(delta[AXIS_X], 2.0) + powf(delta[AXIS_Y], 2.0) + powf(delta[AXIS_Z], 2.0));
+
+        if (delta[axis] != 0)
+        {
+
+            if (normDelta != 0)
             {
                 period = fabs(normDelta/delta[axis]);
             }
-            else
+            else // For extruder only commands
             {
-                period = 1;
+                period = 10; // Not too fast
             }
+
+            if (period == 0) // To be sure the interrupt will get called
+            {
+                period = 10;
+            }
+
             stepper[axis].period_current = (uint32_t) period;
             TIM_SetAutoreload(stepper[axis].timer, stepper[axis].period_current);
             stepper[axis].direction = STEPPER_Waiting;
+        }
+        else
+        {
+            stepper[axis].direction = STEPPER_Stopped; // To be sure of the state of stepper in case it don't have to move
         }
     }
 }
@@ -379,6 +416,8 @@ void stepper_reset()
 void stepper_set_position(STEPPER_AXIS axis, float position)
 {
     stepper[axis].position_current = position;
+    stepper[axis].position_request = position;
+    stepper[axis].direction = STEPPER_Stopped;
 }
 
 /// \todo allow for different feedrate on extruder and z axis
@@ -386,6 +425,13 @@ void stepper_set_feedrate(STEPPER_AXIS axis, uint32_t feedrate_mmpermin)
 {
     // Configure the timer prescalers so the smaller counter (1) goes to the max of the feedrate.
     // Leaves 16 bits of precision for subspeed (1/65535 at min speed)
+
+
+    /// \todo move the max feedrate as a general parameter
+    if (feedrate_mmpermin > 100)
+    {
+        feedrate_mmpermin = 100;
+    }
 
     uint16_t prescaler = 0;
     uint32_t Fclk = 168000000/64; /// At CLK_DIV_1 => APB Timer clock = 168MHz main clock (PLL) /1 (HCLK) /4 (APBx) .... what else ? \see SetSysClock for more details
@@ -398,4 +444,3 @@ void stepper_set_feedrate(STEPPER_AXIS axis, uint32_t feedrate_mmpermin)
     TIM_PrescalerConfig(stepper[axis].timer, prescaler, TIM_PSCReloadMode_Immediate);
 
 }
-
