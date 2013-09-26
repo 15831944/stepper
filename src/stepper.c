@@ -349,6 +349,8 @@ void stepper_move(float pos[AXIS_NUM], bool set[AXIS_NUM])
         }
     }
 
+    bool isAllmovementsStopped = true; // Sometime a request is made using the point where we already are, so no move is done at all.
+
     for (int axis=0; axis<AXIS_NUM; axis++)
     {
         float period = 0.0;
@@ -376,11 +378,18 @@ void stepper_move(float pos[AXIS_NUM], bool set[AXIS_NUM])
             stepper[axis].period_current = (uint32_t) period;
             TIM_SetAutoreload(stepper[axis].timer, stepper[axis].period_current);
             stepper[axis].direction = STEPPER_Waiting;
+            isAllmovementsStopped = false; // At least one move as been requested
         }
         else
         {
             stepper[axis].direction = STEPPER_Stopped; // To be sure of the state of stepper in case it don't have to move
         }
+    }
+
+
+    if(isAllmovementsStopped) // As no move is requested, need to send now the answer the move as been executed, as it will never reach the interrupt
+    {
+        puts("ok\n");
     }
 }
 
